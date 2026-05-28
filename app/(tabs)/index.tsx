@@ -1,98 +1,313 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import ThemeToggleButton from '@/components/CustomHeader';
+import { useTheme } from '@/context/ThemeContext';
+import { client } from '@/hooks/appwrite';
+import { Account, ID } from 'appwrite';
+import { useEffect, useState } from 'react';
+import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [email, setEmail] = useState('');
+  const { isDark } = useTheme();
+  const [password, setPassword] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLogin, setShowLogin] = useState(true);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const PlaceholderImage = require('@/assets/icons/logo.png');
+
+  useEffect(() => {
+    checkCurrentSession();
+  }, []);
+
+  const checkCurrentSession = async () => {
+    try {
+      const account = new Account(client);
+      const user = await account.get();
+      console.log('Already logged in:', user);
+      setIsLoggedIn(true);
+      Alert.alert('Info', `Already logged in as: ${user.email || user.$id}`);
+    } catch (error: any) {
+      console.log('Not logged in');
+      setIsLoggedIn(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const account = new Account(client);
+      await account.deleteSession('current');
+      setIsLoggedIn(false);
+      setEmail('');
+      setPassword('');
+      Alert.alert('Success', 'Logged out successfully');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const createAccountAndLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+
+    try {
+      const account = new Account(client);
+      
+      try {
+        await account.deleteSession('current');
+      } catch (e) {
+        // Ignore if no session exists
+      }
+      
+      const user = await account.create(
+        ID.unique(),
+        email,
+        password,
+        email.split('@')[0]
+      );
+      console.log('✅ Account created:', user);
+      
+      const session = await account.createEmailPasswordSession(email, password);
+      console.log('✅ Login successful:', session);
+      
+      setIsLoggedIn(true);
+      Alert.alert('Success', 'Account created and logged in!');
+    } catch (error: any) {
+      console.log('Error:', error.message);
+      
+      if (error.message.includes('already exists')) {
+        Alert.alert('Info', 'User already exists, trying to login...');
+        await loginOnly();
+      } else {
+        Alert.alert('Error', error.message);
+      }
+    }
+  };
+
+  const loginOnly = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    try {
+      const account = new Account(client);
+      
+      try {
+        await account.deleteSession('current');
+      } catch (e) {
+        // Ignore
+      }
+      
+      const session = await account.createEmailPasswordSession(email, password);
+      console.log('✅ Login successful:', session);
+      setIsLoggedIn(true);
+      Alert.alert('Success', 'Logged in successfully!');
+    } catch (error: any) {
+      console.log('Login failed:', error.message);
+      Alert.alert('Error', `Login failed: ${error.message}`);
+    }
+  };
+
+  if (isLoggedIn) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ThemeToggleButton />
+        <View style={styles.loggedInContainer}>
+          <Text style={[styles.welcomeText, { color: isDark ? '#ffffff' : '#000000' }]}>
+            Добре дошли!
+          </Text>
+          <Text style={[styles.emailText, { color: isDark ? '#888888' : '#666666' }]}>
+            {email}
+          </Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+            <Text style={styles.logoutButtonText}>Изход</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      <ThemeToggleButton />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={PlaceholderImage}
+            style={styles.logo}
+          />
+          <View>
+            <Text style={[styles.appTitle, { color: '#0347F2' }]}>MezekON</Text>
+            <Text style={[styles.appSubtitle, { color: isDark ? '#888888' : '#666666' }]}>
+              Речник на диалектни думи
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.formContainer}>
+          <Text style={[styles.formTitle, { color: isDark ? '#ffffff' : '#000000' }]}>
+            {showLogin ? 'Вход в профила' : 'Създаване на нов профил'}
+          </Text>
+
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: isDark ? '#333333' : '#f5f5f5',
+              color: isDark ? '#ffffff' : '#000000',
+              borderColor: isDark ? '#444444' : '#e0e0e0'
+            }]}
+            placeholder="Имейл адрес"
+            placeholderTextColor={isDark ? '#888888' : '#999999'}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <TextInput
+            style={[styles.input, { 
+              backgroundColor: isDark ? '#333333' : '#f5f5f5',
+              color: isDark ? '#ffffff' : '#000000',
+              borderColor: isDark ? '#444444' : '#e0e0e0'
+            }]}
+            placeholder="Парола"
+            placeholderTextColor={isDark ? '#888888' : '#999999'}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          {!showLogin && (
+            <TextInput
+              style={[styles.input, { 
+                backgroundColor: isDark ? '#333333' : '#f5f5f5',
+                color: isDark ? '#ffffff' : '#000000',
+                borderColor: isDark ? '#444444' : '#e0e0e0'
+              }]}
+              placeholder="Потвърди паролата"
+              placeholderTextColor={isDark ? '#888888' : '#999999'}
+              secureTextEntry
+            />
+          )}
+
+          <TouchableOpacity 
+            style={styles.submitButton}
+            onPress={showLogin ? loginOnly : createAccountAndLogin}
+          >
+            <Text style={styles.submitButtonText}>
+              {showLogin ? 'Вход' : 'Регистрация'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => setShowLogin(!showLogin)}
+            style={styles.switchButton}
+          >
+            <Text style={[styles.switchButtonText, { color: '#0347F2' }]}>
+              {showLogin ? 'Нямате профил? Регистрирайте се' : 'Вече имате профил? Вход'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 20,
+  },
+  logoContainer: {
+    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginTop: 40,
+    marginBottom: 40,
   },
-  stepContainer: {
-    gap: 8,
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 16,
+  },
+  appTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  appSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  input: {
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  submitButton: {
+    backgroundColor: '#0347F2',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  switchButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  switchButtonText: {
+    fontSize: 14,
+  },
+  loggedInContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  emailText: {
+    fontSize: 16,
+    marginBottom: 32,
+  },
+  logoutButton: {
+    backgroundColor: '#0347F2',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  logoutButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
