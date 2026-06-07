@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// we need to fix the bottom boundary so the user doesnt lose the draggable theme changer icon
+
 export default function ThemeToggleButton() {
   const { isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();

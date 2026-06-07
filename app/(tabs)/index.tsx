@@ -115,6 +115,8 @@ export default function HomeScreen() {
   };
 
   if (isLoggedIn) {
+    // will include the word creation and article creation components here
+    // will also make space for further functionlaity such as user roles and custom menus based on the user role
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
         <ThemeToggleButton />
