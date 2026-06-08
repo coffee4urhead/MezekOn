@@ -10,7 +10,7 @@ import { BulgarianAlphabet, DictionaryWord, DictionaryWordMeaning, mappingWordCl
 export default function DictionaryScreen() {
   const { isDark } = useTheme();
 
-  const [allWordsData, setAllWordsData] = useState<WordWithMeanings[]>([]); 
+  const [allWordsData, setAllWordsData] = useState<WordWithMeanings[]>([]);
   const [filteredWordsData, setFilteredWordsData] = useState<WordWithMeanings[]>([]);
   const [allMeanings, setAllMeanings] = useState<DictionaryWordMeaning[]>([]);
   const [allWordsList, setAllWordsList] = useState<DictionaryWord[]>([]);
@@ -34,21 +34,21 @@ export default function DictionaryScreen() {
   async function fetchAllDocuments<T>(collectionId: string, limit: number): Promise<T[]> {
     let allDocuments: T[] = [];
     let offset = 0;
-    
+
     while (true) {
       const response = await databases.listDocuments(
         process.env.EXPO_PUBLIC_DATABASE_WORDS_ID || '',
         collectionId,
         [Query.limit(limit), Query.offset(offset)]
       );
-      
+
       const documents = response.documents as unknown as T[];
       allDocuments = [...allDocuments, ...documents];
-      
+
       if (documents.length < limit) break;
       offset += limit;
     }
-    
+
     return allDocuments;
   }
 
@@ -56,7 +56,7 @@ export default function DictionaryScreen() {
     setLoading(true);
     try {
       const limit = 100;
-      
+
       const [wordsResult, meaningsResult] = await Promise.all([
         fetchAllDocuments<DictionaryWord>(
           process.env.EXPO_PUBLIC_COLLECTION_DICTIONARY_WORDS_ID || '',
@@ -67,11 +67,11 @@ export default function DictionaryScreen() {
           limit
         )
       ]);
-      
+
       setAllWordsList(wordsResult);
       setAllMeanings(meaningsResult);
       mapMeaningsToWords(wordsResult, meaningsResult);
-      
+
     } catch (error) {
       console.error('Error fetching words:', error);
     } finally {
@@ -81,26 +81,26 @@ export default function DictionaryScreen() {
 
   const mapMeaningsToWords = (words: DictionaryWord[], meanings: DictionaryWordMeaning[]) => {
     const meaningsMap = new Map<string, DictionaryWordMeaning[]>();
-    
+
     meanings.forEach(meaning => {
       const existing = meaningsMap.get(meaning.word_id) || [];
       meaningsMap.set(meaning.word_id, [...existing, meaning]);
     });
-    
+
     for (const [wordId, meaningList] of meaningsMap) {
       meaningList.sort((a, b) => a.meaning_order - b.meaning_order);
     }
-    
+
     const joinedWords = words.map(word => ({
       word,
       meanings: meaningsMap.get(word.$id) || []
     }));
-    
+
     setAllWordsData(joinedWords);
     setFilteredWordsData(joinedWords);
-    
+
     console.log(`📚 Mapped ${joinedWords.length} words with ${meanings.length} total meanings`);
-    
+
     return joinedWords;
   };
 
@@ -109,68 +109,68 @@ export default function DictionaryScreen() {
     meanings: DictionaryWordMeaning[],
     words: DictionaryWord[]
   ): { meaning: DictionaryWordMeaning; isInherited: boolean; sourceWord?: DictionaryWord }[] => {
-    
+
     const result: { meaning: DictionaryWordMeaning; isInherited: boolean; sourceWord?: DictionaryWord }[] = [];
-    
+
     const directMeanings = meanings.filter(m => m.word_id === word.$id);
     directMeanings.forEach(meaning => {
       result.push({ meaning, isInherited: false });
     });
-    
-    const inheritedMeanings = meanings.filter(meaning => 
+
+    const inheritedMeanings = meanings.filter(meaning =>
       meaning.assosiated_with_words_ids?.includes(word.$id)
     );
-    
+
     inheritedMeanings.forEach(meaning => {
       if (!result.some(r => r.meaning.$id === meaning.$id)) {
         const sourceWord = words.find(w => w.$id === meaning.word_id);
-        result.push({ 
-          meaning, 
-          isInherited: true, 
-          sourceWord 
+        result.push({
+          meaning,
+          isInherited: true,
+          sourceWord
         });
       }
     });
-    
+
     result.sort((a, b) => a.meaning.meaning_order - b.meaning.meaning_order);
-    
+
     return result;
   }, []);
 
   const applyAllFilters = useCallback((
     wordsData: WordWithMeanings[],
-    letter: string, 
+    letter: string,
     filters: FilterOptions
   ) => {
     let filtered = [...wordsData];
-    
+
     if (letter) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.word.word.toLowerCase().startsWith(letter.toLowerCase())
       );
     }
-    
+
     if (filters.wordClass.length > 0) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         filters.wordClass.includes(item.word.word_class)
       );
     }
-    
+
     if (filters.dialectRegions.length > 0) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         filters.dialectRegions.includes(item.word.dialect_region)
       );
     }
-    
+
     if (filters.hasPronunciation) {
       filtered = filtered.filter(item => item.word.pronunciation !== null);
     }
-    
-    filtered = filtered.filter(item => 
-      item.word.word.length >= filters.wordLengthRange.min && 
+
+    filtered = filtered.filter(item =>
+      item.word.word.length >= filters.wordLengthRange.min &&
       item.word.word.length <= filters.wordLengthRange.max
     );
-    
+
     setFilteredWordsData(filtered);
     console.log(`Filtered to ${filtered.length} words`);
     return filtered;
@@ -191,7 +191,7 @@ export default function DictionaryScreen() {
   }, [isFilterMenuVisible]);
 
   const renderAlphabetItem = useCallback(({ item }: { item: string }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={() => filterByLetter(item)}
       style={{
         height: 65,
@@ -209,27 +209,27 @@ export default function DictionaryScreen() {
     </TouchableOpacity>
   ), [selectedLetter, filterByLetter]);
 
-  const DictionaryWordItem = useCallback(({ 
-    wordData 
-  }: { 
+  const DictionaryWordItem = useCallback(({
+    wordData
+  }: {
     wordData: WordWithMeanings;
   }) => {
     const meaningsWithInheritance = getMeaningsWithInheritance(
-      wordData.word, 
-      allMeanings, 
+      wordData.word,
+      allMeanings,
       allWordsList
     );
-    
+
     return (
-      <View style={{ 
-        padding: 15, 
-        borderBottomWidth: 1, 
-        borderBottomColor: isDark ? '#333' : '#eee' 
+      <View style={{
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: isDark ? '#333' : '#eee'
       }}>
         <Text style={{ color: isDark ? 'white' : 'black', fontWeight: 'bold', fontSize: 18 }}>
           {wordData.word.word}
         </Text>
-        
+
         {meaningsWithInheritance.length > 0 ? (
           <View style={{ marginTop: 8 }}>
             {/* Show first meaning */}
@@ -237,13 +237,13 @@ export default function DictionaryScreen() {
               <Text style={{ color: isDark ? '#ccc' : '#666' }}>
                 📖 {meaningsWithInheritance[0].meaning.definition}
               </Text>
-              
+
               {meaningsWithInheritance[0].meaning.example_sentences?.length > 0 && (
                 <Text style={{ color: isDark ? '#aaa' : '#888', fontSize: 13, marginTop: 4 }}>
                   📝 "{meaningsWithInheritance[0].meaning.example_sentences[0]}"
                 </Text>
               )}
-              
+
               {/* Show associated words using the correct field name */}
               {meaningsWithInheritance[0].meaning.assosiated_with_words_ids?.length > 0 && (
                 <Text style={{ color: '#0347F2', fontSize: 12, marginTop: 4 }}>
@@ -251,7 +251,7 @@ export default function DictionaryScreen() {
                 </Text>
               )}
             </View>
-            
+
             {/* Show additional meanings count */}
             {meaningsWithInheritance.length > 1 && (
               <Text style={{ color: '#0347F2', fontSize: 12, marginTop: 4 }}>
@@ -264,7 +264,7 @@ export default function DictionaryScreen() {
             No definition available
           </Text>
         )}
-        
+
         <Text style={{ color: isDark ? '#999' : '#999', fontSize: 12, marginTop: 2 }}>
           📍 {wordData.word.dialect_region}
         </Text>
@@ -285,7 +285,7 @@ export default function DictionaryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
       <ThemeToggleButton />
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={changeFilterVisibility}
         style={{
           height: 44,
@@ -299,28 +299,28 @@ export default function DictionaryScreen() {
           left: 5,
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 999, 
+          zIndex: 999,
         }}>
         <Image source={filterIcon} style={styles.icon} />
       </TouchableOpacity>
-      
+
       <View style={{ flex: 1, marginTop: 20 }}>
         <FlatList
           horizontal
           data={BulgarianAlphabet}
           keyExtractor={alphabetKeyExtractor}
           showsHorizontalScrollIndicator={false}
-          renderItem={renderAlphabetItem}  
+          renderItem={renderAlphabetItem}
         />
-        
-        <FilterModal 
-          isVisible={isFilterMenuVisible} 
+
+        <FilterModal
+          isVisible={isFilterMenuVisible}
           setVisibility={setMenuVisibilty}
           onApplyFilters={applyFilters}
         />
-        
+
         {selectedLetter && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => filterByLetter('')}
             style={{
               padding: 8,
@@ -334,21 +334,21 @@ export default function DictionaryScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        
+
         {loading ? (
           <Text style={{ textAlign: 'center', marginTop: 20, color: isDark ? 'white' : 'black' }}>
             Loading {allWordsData.length} words...
           </Text>
         ) : (
           <>
-            <Text style={{ 
-              padding: 10, 
+            <Text style={{
+              padding: 10,
               color: isDark ? '#ccc' : '#666',
-              textAlign: 'center' 
+              textAlign: 'center'
             }}>
               Showing {filteredWordsData.length} of {allWordsData.length} words
             </Text>
-            
+
             <FlatList
               data={filteredWordsData}
               keyExtractor={keyExtractor}
