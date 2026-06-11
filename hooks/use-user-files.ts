@@ -18,7 +18,7 @@ interface UserFileData {
   file_type: FileType;
   uploaded_by: string;
   file_id: string;
-  $id: string;  // Document ID in database
+  $id: string;  
   createdAt?: string;
   updatedAt?: string;
   fileUrl?: string;
@@ -33,7 +33,7 @@ interface UploadFileOptions {
 interface UseUserFilesReturn {
   files: UserFileData[];
   profilePhoto: UserFileData | null;
-  coverPhoto: UserFileData | null;  // Added cover photo
+  coverPhoto: UserFileData | null; 
   loading: boolean;
   error: AppwriteException | null;
   isUploading: boolean;
@@ -43,15 +43,15 @@ interface UseUserFilesReturn {
   uploadFile: (options: UploadFileOptions) => Promise<UserFileData>;
   deleteFile: (fileDocumentId: string, storageFileId: string) => Promise<void>;
   deleteProfilePhoto: () => Promise<void>;
-  deleteCoverPhoto: () => Promise<void>;  // Added
+  deleteCoverPhoto: () => Promise<void>;  
   updateProfilePhoto: (file: File) => Promise<UserFileData>;
-  updateCoverPhoto: (file: File) => Promise<UserFileData>;  // Added
-  getFileUrl: (fileId: string) => string;  // Changed to sync
+  updateCoverPhoto: (file: File) => Promise<UserFileData>;  
+  getFileUrl: (fileId: string) => string;  
   getFilesByType: (fileType: FileType) => UserFileData[];
-  getProfilePhotoUrl: () => string | null;  // Changed to sync
-  getCoverPhotoUrl: () => string | null;  // Added
+  getProfilePhotoUrl: () => string | null;  
+  getCoverPhotoUrl: () => string | null;  
   hasProfilePhoto: () => boolean;
-  hasCoverPhoto: () => boolean;  // Added
+  hasCoverPhoto: () => boolean; 
   resetError: () => void;
   refresh: () => Promise<void>;
 }
@@ -65,7 +65,6 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Helper function to get file URL (synchronous)
   const getFileUrl = useCallback((fileId: string): string => {
     return storage.getFileView(STORAGE_BUCKET_ID, fileId);
   }, []);
@@ -109,7 +108,6 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
       setFiles(filesData);
 
-      // Find profile photo and cover photo
       const profilePhotoData = filesData.find(file => file.file_type === 'profile_photo');
       setProfilePhoto(profilePhotoData || null);
       
@@ -176,14 +174,12 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       setIsUploading(true);
       setError(null);
 
-      // Upload to storage
       const storageResponse = await storage.createFile(
         STORAGE_BUCKET_ID,
         ID.unique(),
         options.file
       );
 
-      // Create database record
       const databaseResponse = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID,
@@ -213,7 +209,6 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
       setFiles(prev => [...prev, newFile]);
 
-      // Update the appropriate state based on file type
       if (options.fileType === 'profile_photo') {
         setProfilePhoto(newFile);
       } else if (options.fileType === 'cover_photo') {
@@ -236,10 +231,8 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       setIsDeleting(true);
       setError(null);
 
-      // Delete from storage
       await storage.deleteFile(STORAGE_BUCKET_ID, storageFileId);
 
-      // Delete from database
       await databases.deleteDocument(
         DATABASE_ID,
         COLLECTION_ID,
@@ -249,7 +242,6 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       const deletedFile = files.find(f => f.$id === fileDocumentId);
       setFiles(prev => prev.filter(f => f.$id !== fileDocumentId));
 
-      // Update state based on file type
       if (deletedFile?.file_type === 'profile_photo') {
         setProfilePhoto(null);
       } else if (deletedFile?.file_type === 'cover_photo') {
@@ -339,7 +331,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   return {
     files,
     profilePhoto,
-    coverPhoto,  // Added
+    coverPhoto,  
     loading,
     error,
     isUploading,
@@ -349,15 +341,15 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     uploadFile,
     deleteFile,
     deleteProfilePhoto,
-    deleteCoverPhoto,  // Added
+    deleteCoverPhoto,  
     updateProfilePhoto,
-    updateCoverPhoto,  // Added
+    updateCoverPhoto,  
     getFileUrl,
     getFilesByType,
     getProfilePhotoUrl,
-    getCoverPhotoUrl,  // Added
+    getCoverPhotoUrl,  
     hasProfilePhoto,
-    hasCoverPhoto,  // Added
+    hasCoverPhoto, 
     resetError,
     refresh
   };

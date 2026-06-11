@@ -32,7 +32,6 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
   const [profileError, setProfileError] = useState(false);
   const [coverError, setCoverError] = useState(false);
 
-  // Load profile photo separately
   useEffect(() => {
     const loadProfilePhoto = async () => {
       if (!userInfo.profile_picture_id) {
@@ -58,7 +57,6 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
     loadProfilePhoto();
   }, [userInfo.profile_picture_id]);
 
-  // Load cover photo separately
   useEffect(() => {
     const loadCoverPhoto = async () => {
       if (!userInfo.cover_photo_id) {
@@ -84,7 +82,7 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
     };
 
     loadCoverPhoto();
-  }, [userInfo.cover_photo_id]); // Fixed: Now depends on cover_photo_id
+  }, [userInfo.cover_photo_id]); 
 
   const getAge = () => {
     if (!userInfo.birth_year) return null;
