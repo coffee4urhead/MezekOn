@@ -4,24 +4,21 @@ import { databases, storage } from './appwrite';
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
 const COLLECTION_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_USER_FILES || '';
-const STORAGE_BUCKET_ID = process.env.EXPO_PUBLIC_STORAGE_USER_FILES_BUCKET_ID || '';
-
-// for now only pfps are available !!!!!!
+const STORAGE_BUCKET_ID = process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '';
 
 if (!DATABASE_ID || !COLLECTION_ID || !STORAGE_BUCKET_ID) {
   throw new Error('Missing Appwrite environment variables for user files');
 }
 
-type FileType = 'profile_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other';
+type FileType = 'profile_photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other';
 
 interface UserFileData {
   user_id: string;
-  profile_photo_id: string;
   file_name: string;
   file_type: FileType;
   uploaded_by: string;
   file_id: string;
-  documentId: string;
+  $id: string;  // Document ID in database
   createdAt?: string;
   updatedAt?: string;
   fileUrl?: string;
@@ -31,12 +28,12 @@ interface UploadFileOptions {
   fileName: string;
   fileType: FileType;
   file: File;
-  isProfilePhoto?: boolean;
 }
 
 interface UseUserFilesReturn {
   files: UserFileData[];
   profilePhoto: UserFileData | null;
+  coverPhoto: UserFileData | null;  // Added cover photo
   loading: boolean;
   error: AppwriteException | null;
   isUploading: boolean;
@@ -46,11 +43,15 @@ interface UseUserFilesReturn {
   uploadFile: (options: UploadFileOptions) => Promise<UserFileData>;
   deleteFile: (fileDocumentId: string, storageFileId: string) => Promise<void>;
   deleteProfilePhoto: () => Promise<void>;
+  deleteCoverPhoto: () => Promise<void>;  // Added
   updateProfilePhoto: (file: File) => Promise<UserFileData>;
-  getFileUrl: (fileId: string) => Promise<string>;
+  updateCoverPhoto: (file: File) => Promise<UserFileData>;  // Added
+  getFileUrl: (fileId: string) => string;  // Changed to sync
   getFilesByType: (fileType: FileType) => UserFileData[];
-  getProfilePhotoUrl: () => Promise<string | null>;
+  getProfilePhotoUrl: () => string | null;  // Changed to sync
+  getCoverPhotoUrl: () => string | null;  // Added
   hasProfilePhoto: () => boolean;
+  hasCoverPhoto: () => boolean;  // Added
   resetError: () => void;
   refresh: () => Promise<void>;
 }
@@ -58,10 +59,16 @@ interface UseUserFilesReturn {
 export function useUserFiles(user_id: string): UseUserFilesReturn {
   const [files, setFiles] = useState<UserFileData[]>([]);
   const [profilePhoto, setProfilePhoto] = useState<UserFileData | null>(null);
+  const [coverPhoto, setCoverPhoto] = useState<UserFileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AppwriteException | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Helper function to get file URL (synchronous)
+  const getFileUrl = useCallback((fileId: string): string => {
+    return storage.getFileView(STORAGE_BUCKET_ID, fileId);
+  }, []);
 
   const fetchUserFiles = useCallback(async () => {
     if (!user_id) {
@@ -79,32 +86,39 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         [Query.equal('user_id', user_id)]
       );
 
-      const filesData: UserFileData[] = await Promise.all(response.documents.map(async doc => {
+      const filesData: UserFileData[] = response.documents.map(doc => {
         let fileUrl = undefined;
         try {
-          fileUrl = storage.getFileView(STORAGE_BUCKET_ID, doc.file_id);
+          fileUrl = getFileUrl(doc.file_id);
         } catch (err) {
           console.error('Error getting file URL:', err);
         }
 
         return {
           user_id: doc.user_id,
-          profile_photo_id: doc.profile_photo_id,
           file_name: doc.file_name,
           file_type: doc.file_type,
           uploaded_by: doc.uploaded_by,
           file_id: doc.file_id,
-          documentId: doc.$id,
+          $id: doc.$id,
           createdAt: doc.$createdAt,
           updatedAt: doc.$updatedAt,
           fileUrl
         };
-      }));
+      });
 
       setFiles(filesData);
 
+      // Find profile photo and cover photo
       const profilePhotoData = filesData.find(file => file.file_type === 'profile_photo');
       setProfilePhoto(profilePhotoData || null);
+      
+      const coverPhotoData = filesData.find(file => file.file_type === 'cover_photo');
+      setCoverPhoto(coverPhotoData || null);
+      
+      console.log('Fetched files:', filesData.length);
+      console.log('Profile photo:', profilePhotoData);
+      console.log('Cover photo:', coverPhotoData);
 
     } catch (err) {
       const appwriteError = err as AppwriteException;
@@ -113,7 +127,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     } finally {
       setLoading(false);
     }
-  }, [user_id]);
+  }, [user_id, getFileUrl]);
 
   const fetchFileById = useCallback(async (fileDocumentId: string): Promise<UserFileData | null> => {
     try {
@@ -131,19 +145,18 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
       let fileUrl = undefined;
       try {
-        fileUrl = storage.getFileView(STORAGE_BUCKET_ID, doc.file_id);
+        fileUrl = getFileUrl(doc.file_id);
       } catch (err) {
         console.error('Error getting file URL:', err);
       }
 
       const fileData: UserFileData = {
         user_id: doc.user_id,
-        profile_photo_id: doc.profile_photo_id,
         file_name: doc.file_name,
         file_type: doc.file_type,
         uploaded_by: doc.uploaded_by,
         file_id: doc.file_id,
-        documentId: doc.$id,
+        $id: doc.$id,
         createdAt: doc.$createdAt,
         updatedAt: doc.$updatedAt,
         fileUrl
@@ -156,33 +169,27 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       setError(appwriteError);
       return null;
     }
-  }, [user_id]);
+  }, [user_id, getFileUrl]);
 
   const uploadFile = useCallback(async (options: UploadFileOptions): Promise<UserFileData> => {
     try {
       setIsUploading(true);
       setError(null);
 
-      if (options.isProfilePhoto) {
-        const existingProfilePhoto = files.find(f => f.file_type === 'profile_photo');
-        if (existingProfilePhoto) {
-          await deleteFile(existingProfilePhoto.documentId, existingProfilePhoto.file_id);
-        }
-      }
-
+      // Upload to storage
       const storageResponse = await storage.createFile(
         STORAGE_BUCKET_ID,
         ID.unique(),
         options.file
       );
 
+      // Create database record
       const databaseResponse = await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID,
         ID.unique(),
         {
           user_id: user_id,
-          profile_photo_id: options.isProfilePhoto ? storageResponse.$id : '',
           file_name: options.fileName,
           file_type: options.fileType,
           uploaded_by: user_id,
@@ -190,16 +197,15 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         }
       );
 
-      const fileUrl = storage.getFileView(STORAGE_BUCKET_ID, storageResponse.$id);
+      const fileUrl = getFileUrl(storageResponse.$id);
 
       const newFile: UserFileData = {
         user_id: databaseResponse.user_id,
-        profile_photo_id: databaseResponse.profile_photo_id,
         file_name: databaseResponse.file_name,
         file_type: databaseResponse.file_type,
         uploaded_by: databaseResponse.uploaded_by,
         file_id: databaseResponse.file_id,
-        documentId: databaseResponse.$id,
+        $id: databaseResponse.$id,
         createdAt: databaseResponse.$createdAt,
         updatedAt: databaseResponse.$updatedAt,
         fileUrl
@@ -207,8 +213,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
       setFiles(prev => [...prev, newFile]);
 
-      if (options.isProfilePhoto) {
+      // Update the appropriate state based on file type
+      if (options.fileType === 'profile_photo') {
         setProfilePhoto(newFile);
+      } else if (options.fileType === 'cover_photo') {
+        setCoverPhoto(newFile);
       }
 
       return newFile;
@@ -220,26 +229,31 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     } finally {
       setIsUploading(false);
     }
-  }, [user_id, files]);
+  }, [user_id, getFileUrl]);
 
   const deleteFile = useCallback(async (fileDocumentId: string, storageFileId: string) => {
     try {
       setIsDeleting(true);
       setError(null);
 
+      // Delete from storage
       await storage.deleteFile(STORAGE_BUCKET_ID, storageFileId);
 
+      // Delete from database
       await databases.deleteDocument(
         DATABASE_ID,
         COLLECTION_ID,
         fileDocumentId
       );
 
-      const deletedFile = files.find(f => f.documentId === fileDocumentId);
-      setFiles(prev => prev.filter(f => f.documentId !== fileDocumentId));
+      const deletedFile = files.find(f => f.$id === fileDocumentId);
+      setFiles(prev => prev.filter(f => f.$id !== fileDocumentId));
 
+      // Update state based on file type
       if (deletedFile?.file_type === 'profile_photo') {
         setProfilePhoto(null);
+      } else if (deletedFile?.file_type === 'cover_photo') {
+        setCoverPhoto(null);
       }
 
     } catch (err) {
@@ -254,46 +268,63 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
   const deleteProfilePhoto = useCallback(async () => {
     if (profilePhoto) {
-      await deleteFile(profilePhoto.documentId, profilePhoto.file_id);
+      await deleteFile(profilePhoto.$id, profilePhoto.file_id);
     }
   }, [profilePhoto, deleteFile]);
+
+  const deleteCoverPhoto = useCallback(async () => {
+    if (coverPhoto) {
+      await deleteFile(coverPhoto.$id, coverPhoto.file_id);
+    }
+  }, [coverPhoto, deleteFile]);
 
   const updateProfilePhoto = useCallback(async (file: File): Promise<UserFileData> => {
     return uploadFile({
       fileName: `profile_${user_id}_${Date.now()}.${file.name.split('.').pop()}`,
       fileType: 'profile_photo',
-      file,
-      isProfilePhoto: true
+      file
     });
   }, [user_id, uploadFile]);
 
-  const getFileUrl = useCallback(async (fileId: string): Promise<string> => {
-    try {
-      return storage.getFileView(STORAGE_BUCKET_ID, fileId);
-    } catch (err) {
-      const appwriteError = err as AppwriteException;
-      console.error('Error getting file URL:', appwriteError.message);
-      throw err;
-    }
-  }, []);
+  const updateCoverPhoto = useCallback(async (file: File): Promise<UserFileData> => {
+    return uploadFile({
+      fileName: `cover_${user_id}_${Date.now()}.${file.name.split('.').pop()}`,
+      fileType: 'cover_photo',
+      file
+    });
+  }, [user_id, uploadFile]);
 
   const getFilesByType = useCallback((fileType: FileType) => {
     return files.filter(file => file.file_type === fileType);
   }, [files]);
 
-  const getProfilePhotoUrl = useCallback(async (): Promise<string | null> => {
+  const getProfilePhotoUrl = useCallback((): string | null => {
     if (!profilePhoto) return null;
     try {
-      return await getFileUrl(profilePhoto.file_id);
+      return getFileUrl(profilePhoto.file_id);
     } catch (err) {
       console.error('Error getting profile photo URL:', err);
       return null;
     }
   }, [profilePhoto, getFileUrl]);
 
+  const getCoverPhotoUrl = useCallback((): string | null => {
+    if (!coverPhoto) return null;
+    try {
+      return getFileUrl(coverPhoto.file_id);
+    } catch (err) {
+      console.error('Error getting cover photo URL:', err);
+      return null;
+    }
+  }, [coverPhoto, getFileUrl]);
+
   const hasProfilePhoto = useCallback(() => {
     return !!profilePhoto;
   }, [profilePhoto]);
+
+  const hasCoverPhoto = useCallback(() => {
+    return !!coverPhoto;
+  }, [coverPhoto]);
 
   const resetError = useCallback(() => setError(null), []);
 
@@ -308,6 +339,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   return {
     files,
     profilePhoto,
+    coverPhoto,  // Added
     loading,
     error,
     isUploading,
@@ -317,11 +349,15 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     uploadFile,
     deleteFile,
     deleteProfilePhoto,
+    deleteCoverPhoto,  // Added
     updateProfilePhoto,
+    updateCoverPhoto,  // Added
     getFileUrl,
     getFilesByType,
     getProfilePhotoUrl,
+    getCoverPhotoUrl,  // Added
     hasProfilePhoto,
+    hasCoverPhoto,  // Added
     resetError,
     refresh
   };

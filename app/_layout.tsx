@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '@/context/ThemeContext';
+import { UserProvider } from '@/context/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -16,6 +17,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      <UserProvider>
       <ThemeProvider>
         <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
@@ -25,6 +27,7 @@ export default function RootLayout() {
           <StatusBar style="auto" />
         </NavigationThemeProvider>
       </ThemeProvider>
+      </UserProvider>
     </SafeAreaProvider>
   );
 }

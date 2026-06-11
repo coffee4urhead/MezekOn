@@ -9,7 +9,7 @@ if (!DATABASE_ID || !COLLECTION_ID) {
   throw new Error('Missing Appwrite environment variables for user side information');
 }
 
-type NativeLanguage = 'turkish' | 'english' | 'greek' | 'romanian' | 'bulgarian';
+export type NativeLanguage = 'turkish' | 'english' | 'greek' | 'romanian' | 'bulgarian';
 
 interface UserSideInformationData {
   user_id: string;
@@ -25,7 +25,7 @@ interface UserSideInformationData {
   updatedAt?: string;
 }
 
-interface UseUserSideInformationReturn {
+export interface UseUserSideInformationReturn {
   userSideInfo: UserSideInformationData;
   loading: boolean;
   error: AppwriteException | null;

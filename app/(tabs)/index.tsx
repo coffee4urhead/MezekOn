@@ -1,122 +1,98 @@
 import ThemeToggleButton from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
-import { client } from '@/hooks/appwrite';
-import { Account, ID } from 'appwrite';
+import { useUser } from '@/context/UserContext';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  const [email, setEmail] = useState('');
   const { isDark } = useTheme();
-  const [password, setPassword] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const {
+    user,
+    isLoggedIn,
+    isLoading,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    login,
+    logout,
+    register,
+    clearCredentials
+  } = useUser();
+  
   const [showLogin, setShowLogin] = useState(true);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const PlaceholderImage = require('@/assets/icons/logo.png');
 
   useEffect(() => {
-    checkCurrentSession();
-  }, []);
+    setConfirmPassword('');
+  }, [showLogin]);
 
-  const checkCurrentSession = async () => {
-    try {
-      const account = new Account(client);
-      const user = await account.get();
-      console.log('Already logged in:', user);
-      setIsLoggedIn(true);
-      Alert.alert('Info', `Already logged in as: ${user.email || user.$id}`);
-    } catch (error: any) {
-      console.log('Not logged in');
-      setIsLoggedIn(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      const account = new Account(client);
-      await account.deleteSession('current');
-      setIsLoggedIn(false);
-      setEmail('');
-      setPassword('');
-      Alert.alert('Success', 'Logged out successfully');
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-
-  const createAccountAndLogin = async () => {
+  const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      Alert.alert('Error', 'Моля, въведете имейл и парола');
+      return;
+    }
+
+    try {
+      await login(email, password);
+      Alert.alert('Success', 'Успешен вход!');
+    } catch (error: any) {
+      Alert.alert('Error', `Входът неуспешен: ${error.message}`);
+    }
+  };
+
+  const handleRegister = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Моля, въведете имейл и парола');
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      Alert.alert('Error', 'Паролата трябва да бъде поне 8 символа');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Паролите не съвпадат');
       return;
     }
 
     try {
-      const account = new Account(client);
-      
-      try {
-        await account.deleteSession('current');
-      } catch (e) {
-        // Ignore if no session exists
-      }
-      
-      const user = await account.create(
-        ID.unique(),
-        email,
-        password,
-        email.split('@')[0]
-      );
-      console.log('✅ Account created:', user);
-      
-      const session = await account.createEmailPasswordSession(email, password);
-      console.log('✅ Login successful:', session);
-      
-      setIsLoggedIn(true);
-      Alert.alert('Success', 'Account created and logged in!');
+      await register(email, password);
+      Alert.alert('Success', 'Акаунтът е създаден и влезли сте успешно!');
     } catch (error: any) {
-      console.log('Error:', error.message);
-      
       if (error.message.includes('already exists')) {
-        Alert.alert('Info', 'User already exists, trying to login...');
-        await loginOnly();
+        Alert.alert('Info', 'Потребителят вече съществува, опитайте да влезете');
       } else {
         Alert.alert('Error', error.message);
       }
     }
   };
 
-  const loginOnly = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
-      return;
-    }
-
+  const handleLogout = async () => {
     try {
-      const account = new Account(client);
-      
-      try {
-        await account.deleteSession('current');
-      } catch (e) {
-        // Ignore
-      }
-      
-      const session = await account.createEmailPasswordSession(email, password);
-      console.log('✅ Login successful:', session);
-      setIsLoggedIn(true);
-      Alert.alert('Success', 'Logged in successfully!');
+      await logout();
+      clearCredentials();
+      Alert.alert('Success', 'Успешен изход');
     } catch (error: any) {
-      console.log('Login failed:', error.message);
-      Alert.alert('Error', `Login failed: ${error.message}`);
+      Alert.alert('Error', error.message);
     }
   };
 
-  if (isLoggedIn) {
-    // will include the word creation and article creation components here
-    // will also make space for further functionlaity such as user roles and custom menus based on the user role
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ThemeToggleButton />
+        <View style={styles.loadingContainer}>
+          <Text style={{ color: isDark ? '#ffffff' : '#000000' }}>Зареждане...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (isLoggedIn && user) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
         <ThemeToggleButton />
@@ -125,9 +101,12 @@ export default function HomeScreen() {
             Добре дошли!
           </Text>
           <Text style={[styles.emailText, { color: isDark ? '#888888' : '#666666' }]}>
-            {email}
+            {user.email}
           </Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+          <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
+            {user.name}
+          </Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutButtonText}>Изход</Text>
           </TouchableOpacity>
         </View>
@@ -193,13 +172,15 @@ export default function HomeScreen() {
               }]}
               placeholder="Потвърди паролата"
               placeholderTextColor={isDark ? '#888888' : '#999999'}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
               secureTextEntry
             />
           )}
 
           <TouchableOpacity 
             style={styles.submitButton}
-            onPress={showLogin ? loginOnly : createAccountAndLogin}
+            onPress={showLogin ? handleLogin : handleRegister}
           >
             <Text style={styles.submitButtonText}>
               {showLogin ? 'Вход' : 'Регистрация'}
@@ -299,6 +280,10 @@ const styles = StyleSheet.create({
   },
   emailText: {
     fontSize: 16,
+    marginBottom: 8,
+  },
+  nameText: {
+    fontSize: 14,
     marginBottom: 32,
   },
   logoutButton: {
@@ -311,5 +296,10 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
