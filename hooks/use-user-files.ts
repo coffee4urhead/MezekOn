@@ -82,7 +82,10 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       const response = await databases.listDocuments(
         DATABASE_ID,
         COLLECTION_ID,
-        [Query.equal('user_id', user_id)]
+        [
+          Query.equal('user_id', user_id),
+          Query.orderDesc('$createdAt')
+        ]
       );
 
       const filesData: UserFileData[] = response.documents.map(doc => {
@@ -113,10 +116,6 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       
       const coverPhotoData = filesData.find(file => file.file_type === 'cover_photo');
       setCoverPhoto(coverPhotoData || null);
-      
-      console.log('Fetched files:', filesData.length);
-      console.log('Profile photo:', profilePhotoData);
-      console.log('Cover photo:', coverPhotoData);
 
     } catch (err) {
       const appwriteError = err as AppwriteException;

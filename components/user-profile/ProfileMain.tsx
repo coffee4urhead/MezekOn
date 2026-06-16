@@ -1,3 +1,4 @@
+import SocialsDisplay from '@/components/user-profile/SocialsDisplay';
 import { fetchProfilePhoto } from '@/scripts/util';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -15,6 +16,10 @@ interface UserMainInfo {
   native_language: NativeLanguage | null;
   other_languages: string[] | null;
   dialect_familiarity: string[] | null;
+  website_url?: string | null;
+  facebook_profile?: string | null;
+  instagram_profile?: string | null;
+  linked_in_profile?: string | null;
 }
 
 interface ProfileMainProps {
@@ -25,6 +30,7 @@ interface ProfileMainProps {
 }
 
 export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPress }: ProfileMainProps) {
+
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -43,7 +49,6 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
       setProfileError(false);
       try {
         const photoUrl = await fetchProfilePhoto(userInfo.profile_picture_id, 'profile_pictures');
-        console.log('Profile photo URL:', photoUrl);
         setProfilePhotoUrl(photoUrl);
       } catch (error) {
         console.error('Failed to load profile photo:', error);
@@ -60,17 +65,14 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
   useEffect(() => {
     const loadCoverPhoto = async () => {
       if (!userInfo.cover_photo_id) {
-        console.log('No cover_photo_id provided');
         setCoverPhotoUrl(null);
         return;
       }
 
-      console.log('Loading cover photo with ID:', userInfo.cover_photo_id);
       setCoverLoading(true);
       setCoverError(false);
       try {
         const photoUrl = await fetchProfilePhoto(userInfo.cover_photo_id, 'profile_pictures');
-        console.log('Cover photo URL:', photoUrl);
         setCoverPhotoUrl(photoUrl);
       } catch (error) {
         console.error('Failed to load cover photo:', error);
@@ -173,6 +175,15 @@ export default function ProfileMain({ userInfo, isDark, onEditPress, onStatsPres
         )}
       </View>
 
+      <SocialsDisplay
+        user_id={''}
+        website_url={userInfo.website_url || ''}
+        facebook_profile={userInfo.facebook_profile || ''}
+        instagram_profile={userInfo.instagram_profile || ''}
+        documentId=''
+        linked_in_profile={userInfo.linked_in_profile || ''}>
+        </SocialsDisplay>
+        
       <View style={styles.statsContainer}>
         <TouchableOpacity style={styles.statItem} onPress={() => onStatsPress?.('likes')}>
           <Text style={[styles.statNumber, { color: isDark ? '#ffffff' : '#000000' }]}>128</Text>

@@ -49,7 +49,6 @@ export default function AboutScreen() {
   }, [user?.name, userSideInfo.display_name, updateDisplayName]);
 
   const handleEditPress = () => {
-    console.log('Edit profile pressed');
     setIsEditModalVisible(true); 
   };
 
@@ -116,7 +115,11 @@ export default function AboutScreen() {
                 ...userSideInfo,
                 email: email,
                 profile_picture_id: profilePhoto?.file_id || '',
-                cover_photo_id: coverPhoto?.file_id || ''
+                cover_photo_id: coverPhoto?.file_id || '',
+                website_url: socialContacts.website_url || '',
+                facebook_profile: socialContacts.facebook_profile || '',
+                instagram_profile: socialContacts.instagram_profile || '',
+                linked_in_profile: socialContacts.linked_in_profile || '',
               }}
               isDark={isDark}
               onEditPress={handleEditPress}
@@ -124,8 +127,7 @@ export default function AboutScreen() {
             />
           </View>
         </ScrollView>
-
-        {/* Edit Profile Modal */}
+        
         <EditProfileModal
           isVisible={isEditModalVisible}
           setVisibility={setIsEditModalVisible}
@@ -160,26 +162,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  text: {
-    fontSize: 16,
-    lineHeight: 24,
   },
 });
