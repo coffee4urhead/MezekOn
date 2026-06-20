@@ -1,34 +1,17 @@
 import ThemeToggleButton from '@/components/CustomHeader';
-import { useTheme } from '@/context/ThemeContext';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Fonts } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { StyleSheet, Text, View } from 'react-native';
 
-export default function EventsScreen() {
+// Create the TopTab navigator instance
+const TopTab = createMaterialTopTabNavigator();
+
+// Create the sub-screen components
+function SubScreen1() {
   const { isDark } = useTheme();
-
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
-      <ThemeToggleButton />
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}>
-        
-        <View style={styles.headerSection}>
-          <IconSymbol
-            size={80}
-            color={isDark ? '#0347F2' : '#0347F2'}
-            name="calendar.badge.clock"
-            style={styles.headerIcon}
-          />
-          <Text style={[styles.title, { color: '#0347F2' }]}>Събития</Text>
-          <Text style={[styles.subtitle, { color: isDark ? '#888888' : '#666666' }]}>
-            Актуални събития и статии от региона на Мезек
-          </Text>
-        </View>
-
-        <View style={styles.section}>
+            <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
             📅 Актуални събития
           </Text>
@@ -36,26 +19,13 @@ export default function EventsScreen() {
             Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
           </Text>
         </View>
+  );
+}
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            🎯 Предстоящи събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Скоро ще бъдат обявени нови събития. Очаквайте информация!
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📚 Минали събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Вижте архива с минали събития и статии, свързани с MezekON.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
+function SubScreen2() {
+  const { isDark } = useTheme();
+  return (
+    <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
             📰 Последни статии
           </Text>
@@ -83,7 +53,61 @@ export default function EventsScreen() {
             </Text>
           </View>
         </View>
-      </ScrollView>
+  );
+}
+
+function SubScreen3() {
+  const { isDark } = useTheme();
+  return (
+    <View style={{ padding: 20 }}>
+              <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+            🎯 Предстоящи събития
+          </Text>
+          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
+            Скоро ще бъдат обявени нови събития. Очаквайте информация!
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+            📚 Минали събития
+          </Text>
+          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
+            Вижте архива с минали събития и статии, свързани с MezekON.
+          </Text>
+        </View>
+    </View>
+  );
+}
+
+export default function EventsScreen() {
+  const { isDark } = useTheme();
+
+  return (
+    <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      <ThemeToggleButton />
+      <TopTab.Navigator
+        screenOptions={{
+          tabBarStyle: {
+            backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+          },
+          tabBarIndicatorStyle: {
+            backgroundColor: '#0347F2',
+          },
+          tabBarLabelStyle: {
+            fontWeight: '600',
+            fontSize: 14,
+          },
+          tabBarActiveTintColor: '#0347F2',
+          tabBarInactiveTintColor: isDark ? '#888888' : '#999999',
+        }}
+      >
+        <TopTab.Screen name="Най-ново" component={SubScreen1} />
+        <TopTab.Screen name="История" component={SubScreen2} />
+        <TopTab.Screen name="Новини" component={SubScreen3} />
+        <TopTab.Screen name="Събития" component={SubScreen3} />
+      </TopTab.Navigator>
     </View>
   );
 }
@@ -96,9 +120,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    alignItems: 'center',
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+    marginBottom: 20,
+    paddingHorizontal: 0,
   },
   headerIcon: {
     marginBottom: 16,
