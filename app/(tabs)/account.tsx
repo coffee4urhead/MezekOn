@@ -6,7 +6,7 @@ import { useUser } from '@/context/UserContext';
 import { useUserSocialContacts } from '@/hooks/use-user-socials';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useUserFiles } from '../../hooks/use-user-files';
+import { RNFile, UserFileData, useUserFiles } from '../../hooks/use-user-files';
 import { useUserSideInformation } from '../../hooks/use-user-side-info';
 
 export default function AboutScreen() {
@@ -20,11 +20,14 @@ export default function AboutScreen() {
    
    const { 
     profilePhoto,
+    coverPhoto,
     getFilesByType,
+    updateProfilePhoto,
+    updateCoverPhoto,
   } = useUserFiles(user?.$id || '');
 
   const coverPhotos = getFilesByType('cover_photo');
-  const coverPhoto = coverPhotos.length > 0 ? coverPhotos[0] : null;
+  const coverPhotoFromFiles = coverPhotos.length > 0 ? coverPhotos[0] : null;
 
   const {
     userSideInfo,
@@ -49,6 +52,7 @@ export default function AboutScreen() {
   }, [user?.name, userSideInfo.display_name, updateDisplayName]);
 
   const handleEditPress = () => {
+    console.log('Edit profile pressed');
     setIsEditModalVisible(true); 
   };
 
@@ -92,6 +96,26 @@ export default function AboutScreen() {
       setIsSaving(false);
     }
   };
+
+const handleUpdateProfilePhoto = async (asset: RNFile): Promise<UserFileData> => {
+  const rnFile: RNFile = {
+    uri: asset.uri,
+    name: asset.name || 'profile.jpg',
+    type: asset.type || 'image/jpeg',
+  };
+
+  return await updateProfilePhoto(rnFile);
+};
+
+const handleUpdateCoverPhoto = async (asset: RNFile): Promise<UserFileData> => {
+  const rnFile: RNFile = {
+    uri: asset.uri,
+    name: asset.name || 'cover.jpg',
+    type: asset.type || 'image/jpeg',
+  };
+
+  return await updateCoverPhoto(rnFile);
+};
   
   if (isLoading || loading) {
     return (
@@ -115,7 +139,7 @@ export default function AboutScreen() {
                 ...userSideInfo,
                 email: email,
                 profile_picture_id: profilePhoto?.file_id || '',
-                cover_photo_id: coverPhoto?.file_id || '',
+                cover_photo_id: coverPhotoFromFiles?.file_id || '',
                 website_url: socialContacts.website_url || '',
                 facebook_profile: socialContacts.facebook_profile || '',
                 instagram_profile: socialContacts.instagram_profile || '',
@@ -134,7 +158,11 @@ export default function AboutScreen() {
           userInfo={userSideInfo}
           socialInfo={socialContacts}
           onSave={handleSaveProfile}
+          onUpdateProfilePhoto={handleUpdateProfilePhoto}
+          onUpdateCoverPhoto={handleUpdateCoverPhoto}
           isSaving={isSaving}
+          profilePhotoUrl={profilePhoto?.fileUrl}
+          coverPhotoUrl={coverPhoto?.fileUrl}
         />
       </View>
     ) : (

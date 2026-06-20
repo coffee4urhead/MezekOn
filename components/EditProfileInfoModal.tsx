@@ -1,14 +1,20 @@
+import { RNFile, UserFileData } from '@/hooks/use-user-files';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { NativeLanguage } from '../hooks/use-user-side-info';
 
@@ -43,7 +49,11 @@ interface EditProfileModalProps {
     instagram_profile?: string | null;
     linked_in_profile?: string | null;
   }) => Promise<void>;
+  onUpdateProfilePhoto: (file: RNFile) => Promise<UserFileData>; 
+  onUpdateCoverPhoto: (file: RNFile) => Promise<UserFileData>;
   isSaving: boolean;
+  profilePhotoUrl?: string | null;
+  coverPhotoUrl?: string | null;
 }
 
 const NATIVE_LANGUAGES: NativeLanguage[] = ['bulgarian', 'turkish', 'english', 'greek', 'romanian'];
@@ -56,12 +66,18 @@ export default function EditProfileModal({
   userInfo,
   socialInfo,
   onSave,
+  onUpdateProfilePhoto,
+  onUpdateCoverPhoto,
   isSaving,
+  profilePhotoUrl,
+  coverPhotoUrl,
 }: EditProfileModalProps) {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [birthYear, setBirthYear] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [nativeLanguage, setNativeLanguage] = useState<NativeLanguage | ''>('');
   const [otherLanguages, setOtherLanguages] = useState<string[]>([]);
   const [dialectFamiliarity, setDialectFamiliarity] = useState<string[]>([]);
@@ -76,12 +92,23 @@ export default function EditProfileModal({
   const [tempOtherLanguage, setTempOtherLanguage] = useState('');
   const [tempDialect, setTempDialect] = useState('');
 
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const [uploadingCoverPhoto, setUploadingCoverPhoto] = useState(false);
+
   useEffect(() => {
     if (isVisible) {
+      const birthYearString = userInfo.birth_year
+        ? new Date(userInfo.birth_year).getFullYear().toString()
+        : '';
+      const birthDate = userInfo.birth_year
+        ? new Date(userInfo.birth_year)
+        : undefined;
+
       setDisplayName(userInfo.display_name || '');
       setBio(userInfo.bio || '');
       setLocation(userInfo.location || '');
-      setBirthYear(userInfo.birth_year ? new Date(userInfo.birth_year).getFullYear().toString() : '');
+      setBirthYear(birthYearString);
+      setSelectedDate(birthDate);
       setNativeLanguage(userInfo.native_language || '');
       setOtherLanguages(userInfo.other_languages || []);
       setDialectFamiliarity(userInfo.dialect_familiarity || []);
@@ -98,14 +125,19 @@ export default function EditProfileModal({
     if (displayName !== (userInfo.display_name || '')) updates.display_name = displayName || null;
     if (bio !== (userInfo.bio || '')) updates.bio = bio || null;
     if (location !== (userInfo.location || '')) updates.location = location || null;
-    if (birthYear !== (userInfo.birth_year ? new Date(userInfo.birth_year).getFullYear().toString() : '')) {
+
+    const currentBirthYear = userInfo.birth_year
+      ? new Date(userInfo.birth_year).getFullYear().toString()
+      : '';
+    if (birthYear !== currentBirthYear) {
       updates.birth_year = birthYear ? new Date(parseInt(birthYear), 0, 1) : null;
     }
+
     if (nativeLanguage !== (userInfo.native_language || '')) updates.native_language = nativeLanguage || null;
-    
+
     const otherLangsChanged = JSON.stringify(otherLanguages.sort()) !== JSON.stringify((userInfo.other_languages || []).sort());
     if (otherLangsChanged) updates.other_languages = otherLanguages.length ? otherLanguages : null;
-    
+
     const dialectsChanged = JSON.stringify(dialectFamiliarity.sort()) !== JSON.stringify((userInfo.dialect_familiarity || []).sort());
     if (dialectsChanged) updates.dialect_familiarity = dialectFamiliarity.length ? dialectFamiliarity : null;
 
@@ -144,6 +176,62 @@ export default function EditProfileModal({
     setDialectFamiliarity(dialectFamiliarity.filter(d => d !== dialect));
   };
 
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setSelectedDate(selectedDate);
+      setBirthYear(selectedDate.getFullYear().toString());
+    }
+  };
+
+  const pickImage = async (type: 'profile' | 'cover') => {
+  const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permissionResult.granted) {
+    Alert.alert('Permission required', 'Permission to access the media library is required.');
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: type === 'profile' ? [1, 1] : [16, 9],
+    quality: 0.8,
+  });
+
+  if (!result.canceled && result.assets && result.assets.length > 0) {
+    const asset = result.assets[0];
+    
+    try {
+      
+      
+      const fileName = asset.fileName || `photo_${Date.now()}.jpg`;
+      const file = {
+        uri: asset.uri,
+        name: asset.fileName || `photo_${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
+      };
+
+      if (type === 'profile' && onUpdateProfilePhoto) {
+        setUploadingProfilePhoto(true);
+        await onUpdateProfilePhoto(file as any);
+        Alert.alert('Success', 'Profile photo updated successfully!');
+        setUploadingProfilePhoto(false);
+      } else if (type === 'cover' && onUpdateCoverPhoto) {
+        setUploadingCoverPhoto(true);
+        await onUpdateCoverPhoto(file as any);
+        Alert.alert('Success', 'Cover photo updated successfully!');
+        setUploadingCoverPhoto(false);
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
+      setUploadingProfilePhoto(false);
+      setUploadingCoverPhoto(false);
+    }
+  }
+};
+
   const Section = ({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -154,7 +242,7 @@ export default function EditProfileModal({
     </View>
   );
 
-  const InputField = ({ label, value, onChange, placeholder, multiline = false }: any) => (
+  const InputField = ({ label, value, onChange, placeholder, multiline = false, keyboardType = 'default' }: any) => (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
@@ -165,6 +253,7 @@ export default function EditProfileModal({
         placeholderTextColor="#999"
         multiline={multiline}
         numberOfLines={multiline ? 3 : 1}
+        keyboardType={keyboardType}
       />
     </View>
   );
@@ -189,7 +278,59 @@ export default function EditProfileModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView}>
-            {/* Basic Information */}
+            {/* Photos Section */}
+            <Section title="Photos" icon="images-outline">
+              <View style={styles.photoRow}>
+                {/* Profile Photo */}
+                <View style={styles.photoContainer}>
+                  <Text style={styles.photoLabel}>Profile Photo</Text>
+                  <TouchableOpacity
+                    style={styles.photoButton}
+                    onPress={() => pickImage('profile')}
+                    disabled={uploadingProfilePhoto}
+                  >
+                    {uploadingProfilePhoto ? (
+                      <ActivityIndicator size="large" color="#0347F2" />
+                    ) : profilePhotoUrl ? (
+                      <Image source={{ uri: profilePhotoUrl }} style={styles.photoPreview} />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <Ionicons name="camera-outline" size={32} color="#999" />
+                        <Text style={styles.photoPlaceholderText}>Add Photo</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  {profilePhotoUrl && (
+                    <Text style={styles.photoHint}>Tap to change</Text>
+                  )}
+                </View>
+
+                {/* Cover Photo */}
+                <View style={styles.photoContainer}>
+                  <Text style={styles.photoLabel}>Cover Photo</Text>
+                  <TouchableOpacity
+                    style={styles.photoButton}
+                    onPress={() => pickImage('cover')}
+                    disabled={uploadingCoverPhoto}
+                  >
+                    {uploadingCoverPhoto ? (
+                      <ActivityIndicator size="large" color="#0347F2" />
+                    ) : coverPhotoUrl ? (
+                      <Image source={{ uri: coverPhotoUrl }} style={styles.photoPreview} />
+                    ) : (
+                      <View style={styles.photoPlaceholder}>
+                        <Ionicons name="image-outline" size={32} color="#999" />
+                        <Text style={styles.photoPlaceholderText}>Add Cover</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  {coverPhotoUrl && (
+                    <Text style={styles.photoHint}>Tap to change</Text>
+                  )}
+                </View>
+              </View>
+            </Section>
+
             <Section title="Basic Information" icon="person-outline">
               <InputField
                 label="Display Name"
@@ -210,16 +351,40 @@ export default function EditProfileModal({
                 onChange={setLocation}
                 placeholder="City, Country"
               />
-              <InputField
-                label="Birth Year"
-                value={birthYear}
-                onChange={setBirthYear}
-                placeholder="YYYY"
-                keyboardType="numeric"
-              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Birth Year</Text>
+                <View style={styles.datePickerContainer}>
+                  <TextInput
+                    style={[styles.input, styles.dateInput]}
+                    value={birthYear}
+                    onChangeText={setBirthYear}
+                    placeholder="YYYY"
+                    keyboardType="numeric"
+                    maxLength={4}
+                  />
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Ionicons name="calendar-outline" size={24} color="#0347F2" />
+                  </TouchableOpacity>
+                </View>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                  />
+                )}
+                {selectedDate && (
+                  <Text style={styles.dateHelpText}>
+                    Selected: {selectedDate.toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
             </Section>
 
-            {/* Language Information */}
             <Section title="Language Information" icon="language-outline">
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Native Language</Text>
@@ -287,7 +452,7 @@ export default function EditProfileModal({
                       </TouchableOpacity>
                     </View>
                     <ScrollView style={styles.pickerList}>
-                      {OTHER_LANGUAGES_OPTIONS.filter(l => 
+                      {OTHER_LANGUAGES_OPTIONS.filter(l =>
                         l.toLowerCase().includes(tempOtherLanguage.toLowerCase()) &&
                         !otherLanguages.includes(l)
                       ).map(lang => (
@@ -344,7 +509,7 @@ export default function EditProfileModal({
                       </TouchableOpacity>
                     </View>
                     <ScrollView style={styles.pickerList}>
-                      {DIALECT_OPTIONS.filter(d => 
+                      {DIALECT_OPTIONS.filter(d =>
                         d.toLowerCase().includes(tempDialect.toLowerCase()) &&
                         !dialectFamiliarity.includes(d)
                       ).map(dialect => (
@@ -499,6 +664,29 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  datePickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateInput: {
+    flex: 1,
+  },
+  dateButton: {
+    padding: 12,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dateHelpText: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   pickerButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -630,5 +818,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  // Photo styles
+  photoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 16,
+  },
+  photoContainer: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  photoLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666',
+    marginBottom: 8,
+  },
+  photoButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholderText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  photoHint: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });

@@ -12,13 +12,13 @@ if (!DATABASE_ID || !COLLECTION_ID || !STORAGE_BUCKET_ID) {
 
 type FileType = 'profile_photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other';
 
-interface UserFileData {
+export interface UserFileData {
   user_id: string;
   file_name: string;
   file_type: FileType;
   uploaded_by: string;
   file_id: string;
-  $id: string;  
+  $id: string;
   createdAt?: string;
   updatedAt?: string;
   fileUrl?: string;
@@ -27,13 +27,19 @@ interface UserFileData {
 interface UploadFileOptions {
   fileName: string;
   fileType: FileType;
-  file: File;
+  file: any;
 }
+
+export type RNFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
 
 interface UseUserFilesReturn {
   files: UserFileData[];
   profilePhoto: UserFileData | null;
-  coverPhoto: UserFileData | null; 
+  coverPhoto: UserFileData | null;
   loading: boolean;
   error: AppwriteException | null;
   isUploading: boolean;
@@ -43,15 +49,15 @@ interface UseUserFilesReturn {
   uploadFile: (options: UploadFileOptions) => Promise<UserFileData>;
   deleteFile: (fileDocumentId: string, storageFileId: string) => Promise<void>;
   deleteProfilePhoto: () => Promise<void>;
-  deleteCoverPhoto: () => Promise<void>;  
-  updateProfilePhoto: (file: File) => Promise<UserFileData>;
-  updateCoverPhoto: (file: File) => Promise<UserFileData>;  
-  getFileUrl: (fileId: string) => string;  
+  deleteCoverPhoto: () => Promise<void>;
+  updateProfilePhoto: (file: RNFile) => Promise<UserFileData>;
+  updateCoverPhoto: (file: RNFile) => Promise<UserFileData>;
+  getFileUrl: (fileId: string) => string;
   getFilesByType: (fileType: FileType) => UserFileData[];
-  getProfilePhotoUrl: () => string | null;  
-  getCoverPhotoUrl: () => string | null;  
+  getProfilePhotoUrl: () => string | null;
+  getCoverPhotoUrl: () => string | null;
   hasProfilePhoto: () => boolean;
-  hasCoverPhoto: () => boolean; 
+  hasCoverPhoto: () => boolean;
   resetError: () => void;
   refresh: () => Promise<void>;
 }
@@ -113,7 +119,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
       const profilePhotoData = filesData.find(file => file.file_type === 'profile_photo');
       setProfilePhoto(profilePhotoData || null);
-      
+
       const coverPhotoData = filesData.find(file => file.file_type === 'cover_photo');
       setCoverPhoto(coverPhotoData || null);
 
@@ -173,11 +179,26 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       setIsUploading(true);
       setError(null);
 
+      const fileToUpload = options.file;
+
+      if (!fileToUpload || !fileToUpload.uri) {
+        throw new Error('Invalid file object: missing URI');
+      }
+
+      console.log('Uploading file directly to Appwrite...');
+      console.log('File details:', {
+        uri: fileToUpload.uri,
+        name: fileToUpload.name,
+        type: fileToUpload.type
+      });
+
       const storageResponse = await storage.createFile(
         STORAGE_BUCKET_ID,
         ID.unique(),
-        options.file
+        fileToUpload
       );
+      
+      console.log('Upload successful, file ID:', storageResponse.$id);
 
       const databaseResponse = await databases.createDocument(
         DATABASE_ID,
@@ -215,9 +236,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       }
 
       return newFile;
+
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error uploading file:', appwriteError.message);
+      console.error('Full error:', err);
       setError(appwriteError);
       throw err;
     } finally {
@@ -269,17 +292,17 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     }
   }, [coverPhoto, deleteFile]);
 
-  const updateProfilePhoto = useCallback(async (file: File): Promise<UserFileData> => {
+  const updateProfilePhoto = useCallback(async (file: RNFile): Promise<UserFileData> => {
     return uploadFile({
-      fileName: `profile_${user_id}_${Date.now()}.${file.name.split('.').pop()}`,
+      fileName: `profile_${user_id}_${Date.now()}.jpg`,
       fileType: 'profile_photo',
       file
     });
   }, [user_id, uploadFile]);
 
-  const updateCoverPhoto = useCallback(async (file: File): Promise<UserFileData> => {
+  const updateCoverPhoto = useCallback(async (file: RNFile): Promise<UserFileData> => {
     return uploadFile({
-      fileName: `cover_${user_id}_${Date.now()}.${file.name.split('.').pop()}`,
+      fileName: `cover_${user_id}_${Date.now()}.jpg`,
       fileType: 'cover_photo',
       file
     });
@@ -330,7 +353,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   return {
     files,
     profilePhoto,
-    coverPhoto,  
+    coverPhoto,
     loading,
     error,
     isUploading,
@@ -340,15 +363,15 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     uploadFile,
     deleteFile,
     deleteProfilePhoto,
-    deleteCoverPhoto,  
+    deleteCoverPhoto,
     updateProfilePhoto,
-    updateCoverPhoto,  
+    updateCoverPhoto,
     getFileUrl,
     getFilesByType,
     getProfilePhotoUrl,
-    getCoverPhotoUrl,  
+    getCoverPhotoUrl,
     hasProfilePhoto,
-    hasCoverPhoto, 
+    hasCoverPhoto,
     resetError,
     refresh
   };
