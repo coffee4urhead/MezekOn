@@ -9,11 +9,15 @@ if (!DATABASE_ID || !COLLECTION_ID) {
   throw new Error('Missing Appwrite environment variables for user roles');
 }
 
-type UserRole = 'explorer' | 'scholar' | 'guardian' | 'contributor' | 'admin' | 'keeper' | 'narrator' | 'curator' | 'collector';
+export type UserRole = 'explorer' | 'scholar' | 'guardian' | 'contributor' | 'admin' | 'keeper' | 'narrator' | 'curator' | 'collector';
 
-interface UserRoleData {
+enum RoleRegions {
+  South, East, West, North
+}
+
+export interface UserRoleData {
   user_id: string;
-  region_for_role: string | null;
+  region_for_role: RoleRegions | null;
   unlocked_at: Date;
   is_active: boolean;
   role: UserRole;
@@ -47,13 +51,14 @@ interface UseUserRolesReturn {
   hasRole: (role: UserRole, checkActive?: boolean) => boolean;
   hasAnyRole: (roles: UserRole[], checkActive?: boolean) => boolean;
   hasAllRoles: (roles: UserRole[], checkActive?: boolean) => boolean;
-  getRolesByRegion: (region: string) => UserRoleData[];
+  getRolesByRegion: (region: RoleRegions) => UserRoleData[];
   getHighestRole: () => UserRoleData | null;
   getRolePermissions: (role?: UserRole) => RolePermissions;
   getRoleHierarchyLevel: (role: UserRole) => number;
   isAtLeastRole: (minRole: UserRole) => boolean;
   canPerformAction: (action: 'submit' | 'edit' | 'verify' | 'manage_users' | 'assign_roles' | 'admin_access' | 'view_reports' | 'manage_regions') => boolean;
   resetError: () => void;
+  createDefaultRole: (userId: string) => Promise<UserRoleData>;
   refresh: () => Promise<void>;
 }
 
@@ -99,6 +104,37 @@ export function useUserRoles(user_id: string): UseUserRolesReturn {
       setLoading(false);
     }
   }, [user_id]);
+
+  const createDefaultRole = async (userId: string): Promise<UserRoleData> => {
+    try {
+      const newRoleDoc = await databases.createDocument(
+        DATABASE_ID,
+        COLLECTION_ID,
+        ID.unique(),
+        {
+          user_id: userId,
+          region_for_role: '',
+          unlocked_at: new Date().toISOString(),
+          is_active: true,
+          role: 'explorer'
+        }
+      );
+      
+      return {
+        user_id: newRoleDoc.user_id,
+        region_for_role: newRoleDoc.region_for_role || null,
+        unlocked_at: new Date(newRoleDoc.unlocked_at),
+        is_active: newRoleDoc.is_active,
+        role: newRoleDoc.role as UserRole,
+        documentId: newRoleDoc.$id,
+        createdAt: newRoleDoc.$createdAt,
+        updatedAt: newRoleDoc.$updatedAt
+      };
+    } catch (error) {
+      console.error('Error creating default role:', error);
+      throw error;
+    }
+  };
 
   const assignRole = useCallback(async (role: UserRole, region?: string): Promise<UserRoleData> => {
     try {
@@ -241,7 +277,7 @@ export function useUserRoles(user_id: string): UseUserRolesReturn {
     return roleList.every(role => hasRole(role, checkActive));
   }, [hasRole]);
 
-  const getRolesByRegion = useCallback((region: string) => {
+  const getRolesByRegion = useCallback((region: RoleRegions) => {
     return roles.filter(role => role.region_for_role === region);
   }, [roles]);
 
@@ -443,6 +479,7 @@ export function useUserRoles(user_id: string): UseUserRolesReturn {
 
   return {
     roles,
+    createDefaultRole,
     activeRoles,
     loading,
     error,

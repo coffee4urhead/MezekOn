@@ -5,7 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useUserSocialContacts } from '@/hooks/use-user-socials';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RNFile, UserFileData, useUserFiles } from '../../hooks/use-user-files';
 import { useUserSideInformation } from '../../hooks/use-user-side-info';
 
@@ -16,6 +16,7 @@ export default function AboutScreen() {
       isLoggedIn,
       isLoading,
       email,
+      logout, 
    } = useUser();
    
    const { 
@@ -60,6 +61,14 @@ export default function AboutScreen() {
     console.log(`Stat pressed: ${stat}`);
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   const handleSaveProfile = async (updates: any) => {
     setIsSaving(true);
     try {
@@ -97,25 +106,25 @@ export default function AboutScreen() {
     }
   };
 
-const handleUpdateProfilePhoto = async (asset: RNFile): Promise<UserFileData> => {
-  const rnFile: RNFile = {
-    uri: asset.uri,
-    name: asset.name || 'profile.jpg',
-    type: asset.type || 'image/jpeg',
+  const handleUpdateProfilePhoto = async (asset: RNFile): Promise<UserFileData> => {
+    const rnFile: RNFile = {
+      uri: asset.uri,
+      name: asset.name || 'profile.jpg',
+      type: asset.type || 'image/jpeg',
+    };
+
+    return await updateProfilePhoto(rnFile);
   };
 
-  return await updateProfilePhoto(rnFile);
-};
+  const handleUpdateCoverPhoto = async (asset: RNFile): Promise<UserFileData> => {
+    const rnFile: RNFile = {
+      uri: asset.uri,
+      name: asset.name || 'cover.jpg',
+      type: asset.type || 'image/jpeg',
+    };
 
-const handleUpdateCoverPhoto = async (asset: RNFile): Promise<UserFileData> => {
-  const rnFile: RNFile = {
-    uri: asset.uri,
-    name: asset.name || 'cover.jpg',
-    type: asset.type || 'image/jpeg',
+    return await updateCoverPhoto(rnFile);
   };
-
-  return await updateCoverPhoto(rnFile);
-};
   
   if (isLoading || loading) {
     return (
@@ -128,51 +137,57 @@ const handleUpdateCoverPhoto = async (asset: RNFile): Promise<UserFileData> => {
     );
   }
   
-  return (
-    isLoggedIn ? (
-      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
-        <ThemeToggleButton />
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-            <ProfileMain
-              userInfo={{
-                ...userSideInfo,
-                email: email,
-                profile_picture_id: profilePhoto?.file_id || '',
-                cover_photo_id: coverPhotoFromFiles?.file_id || '',
-                website_url: socialContacts.website_url || '',
-                facebook_profile: socialContacts.facebook_profile || '',
-                instagram_profile: socialContacts.instagram_profile || '',
-                linked_in_profile: socialContacts.linked_in_profile || '',
-              }}
-              isDark={isDark}
-              onEditPress={handleEditPress}
-              onStatsPress={handleStatPress}
-            />
-          </View>
-        </ScrollView>
-        
-        <EditProfileModal
-          isVisible={isEditModalVisible}
-          setVisibility={setIsEditModalVisible}
-          userInfo={userSideInfo}
-          socialInfo={socialContacts}
-          onSave={handleSaveProfile}
-          onUpdateProfilePhoto={handleUpdateProfilePhoto}
-          onUpdateCoverPhoto={handleUpdateCoverPhoto}
-          isSaving={isSaving}
-          profilePhotoUrl={profilePhoto?.fileUrl}
-          coverPhotoUrl={coverPhoto?.fileUrl}
-        />
-      </View>
-    ) : (
+  if (!isLoggedIn) {
+    return (
       <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
         <ThemeToggleButton />
         <View style={styles.centerContent}>
           <Text style={{ color: isDark ? '#ffffff' : '#000000' }}>Please log in</Text>
         </View>
       </View>
-    )
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      <ThemeToggleButton />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
+          <ProfileMain
+            userInfo={{
+              ...userSideInfo,
+              email: email,
+              profile_picture_id: profilePhoto?.file_id || '',
+              cover_photo_id: coverPhotoFromFiles?.file_id || '',
+              website_url: socialContacts.website_url || '',
+              facebook_profile: socialContacts.facebook_profile || '',
+              instagram_profile: socialContacts.instagram_profile || '',
+              linked_in_profile: socialContacts.linked_in_profile || '',
+            }}
+            isDark={isDark}
+            onEditPress={handleEditPress}
+            onStatsPress={handleStatPress}
+          />
+          
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Изход</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+      
+      <EditProfileModal
+        isVisible={isEditModalVisible}
+        setVisibility={setIsEditModalVisible}
+        userInfo={userSideInfo}
+        socialInfo={socialContacts}
+        onSave={handleSaveProfile}
+        onUpdateProfilePhoto={handleUpdateProfilePhoto}
+        onUpdateCoverPhoto={handleUpdateCoverPhoto}
+        isSaving={isSaving}
+        profilePhotoUrl={profilePhoto?.fileUrl}
+        coverPhotoUrl={coverPhoto?.fileUrl}
+      />
+    </View>
   );
 }
 
@@ -190,5 +205,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  logoutButton: {
+    backgroundColor: '#ff3b30',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

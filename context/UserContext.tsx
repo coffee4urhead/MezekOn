@@ -1,4 +1,5 @@
 import { client } from '@/hooks/appwrite';
+import { UserRole, UserRoleData, useUserRoles } from '@/hooks/use-user-roles';
 import { checkCurrentSession } from '@/scripts/util';
 import { Account, ID } from 'appwrite';
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -9,6 +10,9 @@ interface User {
   name: string;
   emailVerification?: boolean;
   phone?: string;
+  role?: UserRole;
+  roles?: UserRole[]; 
+  roleData?: UserRoleData[];
   [key: string]: any;
 }
 
@@ -25,6 +29,12 @@ interface UserContextType {
   register: (email: string, password: string) => Promise<void>;
   checkSession: () => Promise<void>;
   clearCredentials: () => void;
+  hasRole: (role: UserRole, checkActive?: boolean) => boolean;
+  hasAnyRole: (roles: UserRole[], checkActive?: boolean) => boolean;
+  hasAllRoles: (roles: UserRole[], checkActive?: boolean) => boolean;
+  getHighestRole: () => UserRoleData | null;
+  isAtLeastRole: (minRole: UserRole) => boolean;
+  refreshRoles: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -35,57 +45,130 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  const {
+    roles,
+    activeRoles,
+    loading: rolesLoading,
+    error: rolesError,
+    isUpdating,
+    fetchUserRoles,
+    assignRole,
+    revokeRole,
+    deactivateRole,
+    activateRole,
+    hasRole: hasRoleFn,
+    hasAnyRole: hasAnyRoleFn,
+    hasAllRoles: hasAllRolesFn,
+    getRolesByRegion,
+    getHighestRole: getHighestRoleFn,
+    getRolePermissions,
+    getRoleHierarchyLevel,
+    isAtLeastRole: isAtLeastRoleFn,
+    canPerformAction,
+    resetError,
+    refresh,
+    createDefaultRole
+  } = useUserRoles(user?.$id || '');
 
   const account = new Account(client);
 
   const checkSession = async () => {
-    try {
-      setIsLoading(true);
-      const session = await checkCurrentSession();
-      
-      if (session) {
-        const userData = await account.get();
-        setUser(userData);
-        setIsLoggedIn(true);
-        setEmail(userData.email);
-      } else {
-        setUser(null);
-        setIsLoggedIn(false);
-      }
-    } catch (error) {
-      console.error('Session check failed:', error);
-      setUser(null);
-      setIsLoggedIn(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (emailInput: string, passwordInput: string) => {
-    try {
-      setIsLoading(true);
-      
-      try {
-        await account.deleteSession('current');
-      } catch (e) {
-      }
-      
-      const session = await account.createEmailPasswordSession(emailInput, passwordInput);
+  try {
+    setIsLoading(true);
+    const session = await checkCurrentSession();
+    
+    if (session) {
       const userData = await account.get();
       
-      setUser(userData);
-      setIsLoggedIn(true);
-      setEmail(emailInput);
-      setPassword(passwordInput);
+      if (userData.$id) {
+        try {
+          await fetchUserRoles();
+          
+          const roleNames: UserRole[] = activeRoles.map(role => role.role as UserRole);
+          const highestRoleData = getHighestRoleFn();
+          const highestRole: UserRole | undefined = highestRoleData ? highestRoleData.role as UserRole : undefined;
+          
+          console.log('User with id' + user?.$id + 'has these roles' + activeRoles.join(', ').toString());
+          setUser({
+            ...userData,
+            roles: roleNames,
+            role: highestRole,
+            roleData: activeRoles,
+          });
+        } catch (roleError) {
+          console.error('Failed to fetch roles:', roleError);
+          setUser({
+            ...userData,
+            roles: [],
+            role: undefined,
+            roleData: [],
+          });
+        }
+      } else {
+        setUser(userData);
+      }
       
-      console.log('✅ Login successful:', session);
-    } catch (error: any) {
-      console.error('Login failed:', error.message);
-      throw error;
-    } finally {
-      setIsLoading(false);
+      setIsLoggedIn(true);
+      setEmail(userData.email);
+    } else {
+      setUser(null);
+      setIsLoggedIn(false);
     }
-  };
+  } catch (error) {
+    console.error('Session check failed:', error);
+    setUser(null);
+    setIsLoggedIn(false);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  const login = async (emailInput: string, passwordInput: string) => {
+  try {
+    setIsLoading(true);
+    
+    try {
+      await account.deleteSession('current');
+    } catch (e) {
+    }
+    
+    const session = await account.createEmailPasswordSession(emailInput, passwordInput);
+    const userData = await account.get();
+    
+    let roleNames: UserRole[] = []; 
+    let highestRole: UserRole | undefined = undefined; 
+    
+    if (userData.$id) {
+      try {
+        await fetchUserRoles();
+        roleNames = activeRoles.map(role => role.role as UserRole);
+        const highestRoleData = getHighestRoleFn();
+        highestRole = highestRoleData ? highestRoleData.role as UserRole : undefined;
+      } catch (roleError) {
+        console.error('Failed to fetch roles during login:', roleError);
+      }
+    }
+    
+    setUser({
+      ...userData,
+      roles: roleNames,
+      role: highestRole,
+      roleData: activeRoles,
+    });
+    
+    setIsLoggedIn(true);
+    setEmail(emailInput);
+    setPassword(passwordInput);
+    
+    console.log('✅ Login successful:', session);
+  } catch (error: any) {
+    console.error('Login failed:', error.message);
+    throw error;
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const register = async (emailInput: string, passwordInput: string) => {
     try {
@@ -104,14 +187,28 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       );
       
       console.log('✅ Account created:', newUser);
-      
-      const session = await account.createEmailPasswordSession(emailInput, passwordInput);
-      const userData = await account.get();
-      
-      setUser(userData);
-      setIsLoggedIn(true);
-      setEmail(emailInput);
-      setPassword(passwordInput);
+    
+    let defaultRole: UserRoleData | null = null;
+    try {
+      defaultRole = await createDefaultRole(newUser.$id);
+      console.log('✅ Default explorer role created:', defaultRole);
+    } catch (roleError) {
+      console.error('Failed to create default role:', roleError);
+    }
+    
+    const session = await account.createEmailPasswordSession(emailInput, passwordInput);
+    const userData = await account.get();
+    
+    setUser({
+      ...userData,
+      roles: defaultRole ? [defaultRole.role] : [],
+      role: defaultRole ? 'explorer' : undefined,
+      roleData: defaultRole ? [defaultRole] : [],
+    });
+    
+    setIsLoggedIn(true);
+    setEmail(emailInput);
+    setPassword(passwordInput);
       
       console.log('✅ Login successful after registration:', session);
     } catch (error: any) {
@@ -144,6 +241,30 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setPassword('');
   };
 
+  const hasRole = (roleName: UserRole): boolean => {
+    return hasRoleFn(roleName);
+  };
+
+  const hasAnyRole = (roleNames: UserRole[]): boolean => {
+    return hasAnyRoleFn(roleNames);
+  };
+
+  const hasAllRoles = (roleNames: UserRole[]): boolean => {
+    return hasAllRolesFn(roleNames);
+  };
+
+  const getHighestRole = (): UserRoleData | null => {
+    return getHighestRoleFn();
+  };
+
+  const isAtLeastRole = (roleName: UserRole): boolean => {
+    return isAtLeastRoleFn(roleName);
+  };
+
+  const refreshRoles = async (): Promise<void> => {
+    await refresh();
+  };
+
   useEffect(() => {
     checkSession();
   }, []);
@@ -152,7 +273,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     <UserContext.Provider value={{
       user,
       isLoggedIn,
-      isLoading,
+      isLoading: isLoading || rolesLoading,
       email,
       setEmail,
       password,
@@ -161,7 +282,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       logout,
       register,
       checkSession,
-      clearCredentials
+      clearCredentials,
+      hasRole,
+      hasAnyRole,
+      hasAllRoles,
+      getHighestRole,
+      isAtLeastRole,
+      refreshRoles,
     }}>
       {children}
     </UserContext.Provider>

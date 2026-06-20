@@ -71,16 +71,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      clearCredentials();
-      Alert.alert('Success', 'Успешен изход');
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
@@ -106,9 +96,9 @@ export default function HomeScreen() {
           <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
             {user.name}
           </Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Изход</Text>
-          </TouchableOpacity>
+          <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
+            {user.role ? <Text>{user.role}</Text> : <Text>No roles</Text>}
+          </Text>
         </View>
       </View>
     );
