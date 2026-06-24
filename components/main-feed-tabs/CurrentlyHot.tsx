@@ -1,6 +1,5 @@
 import { useTheme } from '@/context/ThemeContext';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import CreateButton from '../ui/CreateButton';
 
 export default function CurrentlyHot() {
   const { isDark } = useTheme();
@@ -106,8 +105,6 @@ export default function CurrentlyHot() {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
-
-      <CreateButton />
     </View>
   );
 }

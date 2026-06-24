@@ -3,7 +3,14 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Popover, { PopoverPlacement } from 'react-native-popover-view';
 
-export default function CreateButton() {
+export enum CreationScreen {
+    'History', 'News', 'Events'
+}
+
+interface CreateButtonProps {
+    creationScreen: CreationScreen
+}
+export default function CreateButton({ creationScreen } : CreateButtonProps) {
   const { isDark } = useTheme();
   const [isPopoverVisible, setIsPopoverVisible] = useState(false);
   const createButtonImage = require('@/assets/icons/pencil.png');
@@ -12,6 +19,36 @@ export default function CreateButton() {
     setIsPopoverVisible(false);
     console.log(`Selected: ${option}`);
   };
+
+  const getOptions = () => {
+    switch (creationScreen) {
+      case CreationScreen.History:
+        return [
+          { id: 'add_post', label: '📝 Добави архив', action: 'Add Archive' },
+          { id: 'add_event', label: '📅 Добави аудио', action: 'Add Audio' },
+        ];
+      
+      case CreationScreen.News:
+        return [
+          { id: 'add_word', label: '📖 Добави новина', action: 'Add News' },
+        ];
+      
+      case CreationScreen.Events:
+        return [
+          { id: 'add_event', label: '📅 Добави събитие', action: 'Add Event' },
+          { id: 'add_announcement', label: '📢 Добави обявление', action: 'Add Announcement' },
+          { id: 'add_gallery', label: '🖼️ Добави галерия', action: 'Add Gallery' },
+        ];
+      
+      default:
+        return [
+          { id: 'add_post', label: '📝 Добави статия', action: 'Add Post' },
+          { id: 'add_event', label: '📅 Добави събитие', action: 'Add Event' },
+        ];
+    }
+  };
+
+  const options = getOptions();
 
   return (
     <Popover
@@ -38,32 +75,17 @@ export default function CreateButton() {
       ]}
     >
       <View style={styles.optionsContainer}>
-        <TouchableOpacity 
-          style={styles.optionItem} 
-          onPress={() => handleOptionPress('Add Post')}
-        >
-          <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📝 Добави статия
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.optionItem} 
-          onPress={() => handleOptionPress('Add Event')}
-        >
-          <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📅 Добави събитие
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.optionItem} 
-          onPress={() => handleOptionPress('Add Word')}
-        >
-          <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📖 Добави дума
-          </Text>
-        </TouchableOpacity>
+        {options.map((option) => (
+          <TouchableOpacity 
+            key={option.id}
+            style={styles.optionItem} 
+            onPress={() => handleOptionPress(option.action)}
+          >
+            <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </Popover>
   );

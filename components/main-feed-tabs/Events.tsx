@@ -1,5 +1,6 @@
 import { useTheme } from '@/context/ThemeContext';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import CreateButton, { CreationScreen } from '../ui/CreateButton';
 
 export default function Events() {
   const { isDark } = useTheme();
@@ -9,7 +10,11 @@ export default function Events() {
       styles.container, 
       { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }
     ]}>
-      <View style={styles.section}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
           🎯 Предстоящи събития
         </Text>
@@ -26,6 +31,8 @@ export default function Events() {
           Вижте архива с минали събития и статии, свързани с MezekON.
         </Text>
       </View>
+        </ScrollView>
+        <CreateButton creationScreen={CreationScreen.Events}/>
     </View>
   );
 }
@@ -35,6 +42,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+    scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   section: {
     marginBottom: 24,
