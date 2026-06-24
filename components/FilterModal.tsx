@@ -6,7 +6,7 @@ interface FilterModalProps {
   setVisibility: Dispatch<SetStateAction<boolean>>;
   onApplyFilters: (filters: FilterOptions) => void;
 }
-// will need to fix the two types of filters integration. Why do the mnu advanced filters and the character selection filter dont apply at the same time
+
 export interface FilterOptions {
   wordClass: string[];
   dialectRegions: string[];

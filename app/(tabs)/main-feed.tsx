@@ -1,9 +1,14 @@
 import ThemeToggleButton from '@/components/CustomHeader';
-import { useTheme } from '@/context/ThemeContext';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import CurrentlyHot from '@/components/main-feed-tabs/CurrentlyHot';
+import Events from '@/components/main-feed-tabs/Events';
+import History from '@/components/main-feed-tabs/History';
+import News from '@/components/main-feed-tabs/News';
 import { Fonts } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { StyleSheet, View } from 'react-native';
+
+const TopTab = createMaterialTopTabNavigator();
 
 export default function EventsScreen() {
   const { isDark } = useTheme();
@@ -11,84 +16,32 @@ export default function EventsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
       <ThemeToggleButton />
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}>
-        
-        <View style={styles.headerSection}>
-          <IconSymbol
-            size={80}
-            color={isDark ? '#0347F2' : '#0347F2'}
-            name="calendar.badge.clock"
-            style={styles.headerIcon}
-          />
-          <Text style={[styles.title, { color: '#0347F2' }]}>Събития</Text>
-          <Text style={[styles.subtitle, { color: isDark ? '#888888' : '#666666' }]}>
-            Актуални събития и статии от региона на Мезек
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📅 Актуални събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            🎯 Предстоящи събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Скоро ще бъдат обявени нови събития. Очаквайте информация!
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📚 Минали събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Вижте архива с минали събития и статии, свързани с MezekON.
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📰 Последни статии
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Диалектните думи на Мезек
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              15 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Изследване на уникалните диалектни думи, характерни за региона на Мезек...
-            </Text>
-          </View>
-          
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Културно наследство
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              10 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Запазване на културното наследство чрез диалектния речник MezekON...
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+      <TopTab.Navigator
+        screenOptions={{
+          tabBarStyle: {
+            backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+          },
+          tabBarIndicatorStyle: {
+            backgroundColor: '#0347F2',
+          },
+          tabBarLabelStyle: {
+            fontWeight: '600',
+            fontSize: 14,
+          },
+          tabBarActiveTintColor: '#0347F2',
+          tabBarInactiveTintColor: isDark ? '#888888' : '#999999',
+        }}
+      >
+        <TopTab.Screen name="Най-ново" component={CurrentlyHot} />
+        <TopTab.Screen name="История" component={History} />
+        <TopTab.Screen name="Новини" component={News} />
+        <TopTab.Screen name="Събития" component={Events} />
+      </TopTab.Navigator>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -96,9 +49,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    alignItems: 'center',
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+    marginBottom: 20,
+    paddingHorizontal: 0,
   },
   headerIcon: {
     marginBottom: 16,

@@ -9,7 +9,7 @@ if (!DATABASE_ID || !COLLECTION_ID) {
   throw new Error('Missing Appwrite environment variables for contacts and social');
 }
 
-interface UserSocialContactsData {
+export interface UserSocialContactsData {
   user_id: string;
   website_url: string | null;
   facebook_profile: string | null;
