@@ -1,85 +1,14 @@
 import ThemeToggleButton from '@/components/CustomHeader';
+import CurrentlyHot from '@/components/main-feed-tabs/CurrentlyHot';
+import Events from '@/components/main-feed-tabs/Events';
+import History from '@/components/main-feed-tabs/History';
+import News from '@/components/main-feed-tabs/News';
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-// Create the TopTab navigator instance
 const TopTab = createMaterialTopTabNavigator();
-
-// Create the sub-screen components
-function SubScreen1() {
-  const { isDark } = useTheme();
-  return (
-            <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📅 Актуални събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
-          </Text>
-        </View>
-  );
-}
-
-function SubScreen2() {
-  const { isDark } = useTheme();
-  return (
-    <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📰 Последни статии
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Диалектните думи на Мезек
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              15 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Изследване на уникалните диалектни думи, характерни за региона на Мезек...
-            </Text>
-          </View>
-          
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Културно наследство
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              10 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Запазване на културното наследство чрез диалектния речник MezekON...
-            </Text>
-          </View>
-        </View>
-  );
-}
-
-function SubScreen3() {
-  const { isDark } = useTheme();
-  return (
-    <View style={{ padding: 20 }}>
-              <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            🎯 Предстоящи събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Скоро ще бъдат обявени нови събития. Очаквайте информация!
-          </Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📚 Минали събития
-          </Text>
-          <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
-            Вижте архива с минали събития и статии, свързани с MezekON.
-          </Text>
-        </View>
-    </View>
-  );
-}
 
 export default function EventsScreen() {
   const { isDark } = useTheme();
@@ -103,16 +32,16 @@ export default function EventsScreen() {
           tabBarInactiveTintColor: isDark ? '#888888' : '#999999',
         }}
       >
-        <TopTab.Screen name="Най-ново" component={SubScreen1} />
-        <TopTab.Screen name="История" component={SubScreen2} />
-        <TopTab.Screen name="Новини" component={SubScreen3} />
-        <TopTab.Screen name="Събития" component={SubScreen3} />
+        <TopTab.Screen name="Най-ново" component={CurrentlyHot} />
+        <TopTab.Screen name="История" component={History} />
+        <TopTab.Screen name="Новини" component={News} />
+        <TopTab.Screen name="Събития" component={Events} />
       </TopTab.Navigator>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
