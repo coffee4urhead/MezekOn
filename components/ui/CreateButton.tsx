@@ -2,6 +2,8 @@ import { useTheme } from '@/context/ThemeContext';
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Popover, { PopoverPlacement } from 'react-native-popover-view';
+import UploadAudio from '../modals/AudioUploadComponent';
+import UploadHistoryArchive from '../modals/HistoryUploadArchive';
 
 export enum CreationScreen {
     'History', 'News', 'Events'
@@ -10,13 +12,30 @@ export enum CreationScreen {
 interface CreateButtonProps {
     creationScreen: CreationScreen
 }
-export default function CreateButton({ creationScreen } : CreateButtonProps) {
+
+export default function CreateButton({ creationScreen }: CreateButtonProps) {
   const { isDark } = useTheme();
   const [isPopoverVisible, setIsPopoverVisible] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<string | null>(null);
+  const [optionModalUploadVisible, setOptionModalVisibilty] = useState<boolean>(false);
+  
   const createButtonImage = require('@/assets/icons/pencil.png');
 
   const handleOptionPress = (option: string) => {
     setIsPopoverVisible(false);
+    setSelectedAction(option);
+    
+    switch(option) {
+      case "Add Archive":
+        setOptionModalVisibilty(true);
+        break;
+      case "Add Audio":
+        setOptionModalVisibilty(true);
+        break;
+      default:
+        console.log("Something went wrong! Wrong option pressed!");
+        break;
+    }
     console.log(`Selected: ${option}`);
   };
 
@@ -50,44 +69,69 @@ export default function CreateButton({ creationScreen } : CreateButtonProps) {
 
   const options = getOptions();
 
-  return (
-    <Popover
-      isVisible={isPopoverVisible}
-      onRequestClose={() => setIsPopoverVisible(false)}
-      from={(
-        <TouchableOpacity 
-          style={styles.createButtonContainer} 
-          activeOpacity={0.7}
-          onPress={() => setIsPopoverVisible(true)}
-          accessibilityLabel="Create new item"
-        >
-          <Image
-            source={createButtonImage}
-            style={styles.pencilImage}
-            resizeMode="contain"
+  const renderModal = () => {
+    switch (selectedAction) {
+      case "Add Archive":
+        return (
+          <UploadHistoryArchive 
+            isModalClicked={optionModalUploadVisible} 
+            setModalVisibility={setOptionModalVisibilty}
           />
-        </TouchableOpacity>
-      )}
-      placement={PopoverPlacement.TOP}
-      popoverStyle={[
-        styles.popoverContainer,
-        { backgroundColor: isDark ? '#2a2a2a' : '#ffffff' }
-      ]}
-    >
-      <View style={styles.optionsContainer}>
-        {options.map((option) => (
+        );
+      case "Add Audio":
+      return ( 
+        <UploadAudio
+          isModalClicked={optionModalUploadVisible}
+          setModalVisibility={setOptionModalVisibilty}
+        />
+      );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <Popover
+        isVisible={isPopoverVisible}
+        onRequestClose={() => setIsPopoverVisible(false)}
+        from={(
           <TouchableOpacity 
-            key={option.id}
-            style={styles.optionItem} 
-            onPress={() => handleOptionPress(option.action)}
+            style={styles.createButtonContainer} 
+            activeOpacity={0.7}
+            onPress={() => setIsPopoverVisible(true)}
+            accessibilityLabel="Create new item"
           >
-            <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
-              {option.label}
-            </Text>
+            <Image
+              source={createButtonImage}
+              style={styles.pencilImage}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
-        ))}
-      </View>
-    </Popover>
+        )}
+        placement={PopoverPlacement.TOP}
+        popoverStyle={[
+          styles.popoverContainer,
+          { backgroundColor: isDark ? '#2a2a2a' : '#ffffff' }
+        ]}
+      >
+        <View style={styles.optionsContainer}>
+          {options.map((option) => (
+            <TouchableOpacity 
+              key={option.id}
+              style={styles.optionItem} 
+              onPress={() => handleOptionPress(option.action)}
+            >
+              <Text style={[styles.optionText, { color: isDark ? '#ffffff' : '#333333' }]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Popover>
+      
+      {renderModal()}
+    </>
   );
 }
 

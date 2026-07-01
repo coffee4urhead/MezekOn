@@ -1,4 +1,4 @@
-import { Models } from 'appwrite';
+import { Models } from 'react-native-appwrite';
 
 const BulgarianAlphabet = [
   'а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й',

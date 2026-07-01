@@ -1,6 +1,6 @@
 import { client } from '@/hooks/appwrite';
-import { Account, AppwriteException } from 'appwrite';
 import { Alert } from 'react-native';
+import { Account, AppwriteException } from 'react-native-appwrite';
 
 export const checkCurrentSession = async () => {
     try {

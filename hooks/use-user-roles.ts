@@ -1,5 +1,5 @@
-import { AppwriteException, ID, Query } from 'appwrite';
 import { useCallback, useEffect, useState } from 'react';
+import { AppwriteException, ID, Query } from 'react-native-appwrite';
 import { databases } from './appwrite';
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
@@ -11,8 +11,13 @@ if (!DATABASE_ID || !COLLECTION_ID) {
 
 export type UserRole = 'explorer' | 'scholar' | 'guardian' | 'contributor' | 'admin' | 'keeper' | 'narrator' | 'curator' | 'collector';
 
-enum RoleRegions {
-  South, East, West, North
+export enum RoleRegions {
+    South = 'south',
+  East = 'east',
+  West = 'west',
+  North = 'north',
+  All = 'all', 
+  None = 'none'
 }
 
 export interface UserRoleData {

@@ -1,4 +1,4 @@
-import { Client, Databases, Storage, Functions } from 'appwrite';
+import { Client, Databases, Functions, Storage } from 'react-native-appwrite';
 
 const client = new Client();
 
@@ -10,4 +10,4 @@ const databases = new Databases(client);
 const storage = new Storage(client);
 const functions = new Functions(client);
 
-export { client, databases, storage, functions };
+export { client, databases, functions, storage };

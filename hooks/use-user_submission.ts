@@ -1,7 +1,7 @@
-import { AppwriteException, ID, Query } from 'appwrite';
 import { useCallback, useEffect, useState } from 'react';
+import { AppwriteException, ID, Query } from 'react-native-appwrite';
 import { databases } from './appwrite';
-import { useUserRoles } from './use-user-roles';
+import { RoleRegions, useUserRoles } from './use-user-roles';
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
 const COLLECTION_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_USER_SUBMISSIONS || '';
@@ -20,7 +20,7 @@ interface UserSubmissionData {
   target_word_id: string | null;
   new_word: string | null;
   new_word_class: WordClass | null;
-  dialect_region: string | null;
+  dialect_region: RoleRegions | null;
   suggested_definition: string | null;
   pronunciation_audio_id: string | null;
   photo_file_ids: string[] | null;
@@ -60,7 +60,7 @@ interface UseUserSubmissionsReturn {
   getRejectedSubmissions: () => UserSubmissionData[];
   getSubmissionsByType: (type: SubmissionType) => UserSubmissionData[];
   getSubmissionsPendingReview: () => UserSubmissionData[];
-  getSubmissionsByRegion: (region: string) => UserSubmissionData[];
+  getSubmissionsByRegion: (region: RoleRegions) => UserSubmissionData[];
   addPhotoToSubmission: (submissionId: string, photoFileId: string) => Promise<void>;
   removePhotoFromSubmission: (submissionId: string, photoFileId: string) => Promise<void>;
   canUserReviewSubmission: (submission: UserSubmissionData) => boolean;
@@ -278,7 +278,7 @@ export function useUserSubmissions(user_id: string): UseUserSubmissionsReturn {
     }
 
     if (hasRole('guardian') && submission.dialect_region) {
-      const guardianRoles = getRolesByRegion(submission.dialect_region);
+      const guardianRoles = getRolesByRegion(submission.dialect_region as RoleRegions);
       return guardianRoles.some(r => r.role === 'guardian' && r.is_active);
     }
 
@@ -496,7 +496,7 @@ export function useUserSubmissions(user_id: string): UseUserSubmissionsReturn {
       return submissions.filter(sub => sub.status === 'pending');
     } else if (hasRole('guardian')) {
 
-      const guardianRegions = getRolesByRegion('').filter(r => r.role === 'guardian' && r.is_active);
+      const guardianRegions = getRolesByRegion(RoleRegions.None).filter(r => r.role === 'guardian' && r.is_active);
       return submissions.filter(sub =>
         sub.status === 'pending' &&
         guardianRegions.some(region => region.region_for_role === sub.dialect_region)
@@ -505,7 +505,7 @@ export function useUserSubmissions(user_id: string): UseUserSubmissionsReturn {
     return [];
   }, [submissions, hasAnyRole, hasRole, getRolesByRegion]);
 
-  const getSubmissionsByRegion = useCallback((region: string) => {
+  const getSubmissionsByRegion = useCallback((region: RoleRegions) => {
     return submissions.filter(sub => sub.dialect_region === region);
   }, [submissions]);
 
