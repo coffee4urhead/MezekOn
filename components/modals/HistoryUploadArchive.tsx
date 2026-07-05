@@ -2,16 +2,20 @@ import { useUser } from '@/context/UserContext';
 import { useUserFiles } from '@/hooks/use-user-files';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Dispatch, memo, SetStateAction, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 
@@ -27,16 +31,138 @@ interface DocumentAsset {
     mimeType: string;
 }
 
+const TitleInput = memo(({ 
+  value, 
+  onChange, 
+  editable 
+}: { 
+  value: string; 
+  onChange: (text: string) => void; 
+  editable: boolean;
+}) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.inputLabel}>Заглавие *</Text>
+    <TextInput
+      style={styles.input}
+      value={value}
+      onChangeText={onChange}
+      placeholder="Въведете заглавие на документа"
+      placeholderTextColor="#999"
+      editable={editable}
+      scrollEnabled={false}
+      returnKeyType="done"
+      blurOnSubmit={true}
+    />
+  </View>
+));
+
+const DescriptionInput = memo(({ 
+  value, 
+  onChange, 
+  editable 
+}: { 
+  value: string; 
+  onChange: (text: string) => void; 
+  editable: boolean;
+}) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.inputLabel}>Описание</Text>
+    <TextInput
+      style={[styles.input, styles.textArea]}
+      value={value}
+      onChangeText={onChange}
+      placeholder="Въведете описание на документа"
+      placeholderTextColor="#999"
+      multiline={true}
+      numberOfLines={4}
+      editable={editable}
+      scrollEnabled={false}
+      returnKeyType="default"
+      blurOnSubmit={true}
+      textAlignVertical="top"
+    />
+  </View>
+));
+
+
+const Section = memo(({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Ionicons name={icon as any} size={20} color="#0347F2" />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    <View style={styles.sectionContent}>{children}</View>
+  </View>
+));
+
+const DocumentPickerSection = memo(({ 
+  document, 
+  isUploading, 
+  onPickDocument, 
+  onRemoveDocument,
+  formatFileSize
+}: any) => (
+  <Section title="Качване на файл" icon="cloud-upload-outline">
+    <View style={styles.uploadArea}>
+      {document ? (
+        <View style={styles.documentInfo}>
+          <View style={styles.documentIcon}>
+            <Ionicons 
+              name={document.mimeType.includes('pdf') ? 'document-text' : 
+                    document.mimeType.includes('image') ? 'image' : 
+                    document.mimeType.includes('word') ? 'document' :
+                    'document'} 
+              size={40} 
+              color="#0347F2" 
+            />
+          </View>
+          <View style={styles.documentDetails}>
+            <Text style={styles.documentName} numberOfLines={2}>
+              {document.name}
+            </Text>
+            <Text style={styles.documentSize}>
+              {formatFileSize(document.size)}
+            </Text>
+            <Text style={styles.documentType}>
+              {document.mimeType}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.removeDocumentButton}
+            onPress={onRemoveDocument}
+            disabled={isUploading}
+          >
+            <Ionicons name="close-circle" size={24} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.pickButton} 
+          onPress={onPickDocument}
+          disabled={isUploading}
+        >
+          <Ionicons name="cloud-upload-outline" size={48} color="#0347F2" />
+          <Text style={styles.pickButtonText}>Изберете файл</Text>
+          <Text style={styles.pickButtonSubtext}>
+            Поддържани формати: PDF, DOC, DOCX, JPG, PNG
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </Section>
+));
+
+
 export default function UploadHistoryArchive({ isModalClicked, setModalVisibility }: HistoryUploadArchiveProps) {
   const { user } = useUser();
-  const { uploadHistoryArchive, isUploading: isHookUploading } = useUserFiles(user?.$id || '');
+  const { uploadHistoryArchive } = useUserFiles(user?.$id || '');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [document, setDocument] = useState<DocumentAsset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const pickDocument = async () => {
+  const pickDocument = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/*'],
@@ -57,21 +183,34 @@ export default function UploadHistoryArchive({ isModalClicked, setModalVisibilit
       console.error('Error picking document:', error);
       Alert.alert('Грешка', 'Възникна проблем при избора на файл.');
     }
-  };
+  }, []);
 
-  const removeDocument = () => {
+  const removeDocument = useCallback(() => {
     setDocument(null);
-  };
+  }, []);
 
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = useCallback((bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setDocument(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (!isUploading) {
+      Keyboard.dismiss();
+      setModalVisibility(false);
+    }
+  }, [isUploading, setModalVisibility]);
+
+  const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
       Alert.alert('Грешка', 'Моля, въведете заглавие.');
       return;
@@ -100,16 +239,15 @@ export default function UploadHistoryArchive({ isModalClicked, setModalVisibilit
       console.log('Starting upload with user ID:', user.$id);
       console.log('File to upload:', fileToUpload);
 
-      const result = await uploadHistoryArchive({
+      await uploadHistoryArchive({
         fileName: document.name,
         fileType: 'document',
         file: fileToUpload,
         title: title,
         description: description,
+        is_approved: false
       });
 
-      console.log('Upload successful:', result);
-      
       Alert.alert(
         'Успех', 
         'Документът беше качен успешно! Предстои да бъде одобрен!',
@@ -143,158 +281,91 @@ export default function UploadHistoryArchive({ isModalClicked, setModalVisibilit
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setDocument(null);
-  };
-
-  const Section = ({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name={icon as any} size={20} color="#0347F2" />
-        <Text style={styles.sectionTitle}>{title}</Text>
-      </View>
-      <View style={styles.sectionContent}>{children}</View>
-    </View>
-  );
-
-  const InputField = ({ label, value, onChange, placeholder, multiline = false, keyboardType = 'default' }: any) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={[styles.input, multiline && styles.textArea]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#999"
-        multiline={multiline}
-        numberOfLines={multiline ? 4 : 1}
-        keyboardType={keyboardType}
-        editable={!isUploading}
-      />
-    </View>
-  );
+  }, [title, document, user, uploadHistoryArchive, resetForm, setModalVisibility]);
 
   return (
     <Modal
       animationType="slide"
       transparent={true}
       visible={isModalClicked}
-      onRequestClose={() => {
-        if (!isUploading) setModalVisibility(false);
-      }}
+      onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Качи исторически записи и документи</Text>
-              <Text style={styles.headerSubtitle}>
-                Качвай документи от истинско значение за България и запазването на родната идентичност
-              </Text>
-            </View>
-            <TouchableOpacity 
-              onPress={() => !isUploading && setModalVisibility(false)} 
-              style={styles.closeButton}
-              disabled={isUploading}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.header}>
+                <View style={styles.headerContent}>
+                  <Text style={styles.headerTitle}>Качи исторически записи и документи</Text>
+                  <Text style={styles.headerSubtitle}>
+                    Качвай документи от истинско значение за България и запазването на родната идентичност
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={handleClose} 
+                  style={styles.closeButton}
+                  disabled={isUploading}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <Section title="Информация за документа" icon="document-text-outline">
-              <InputField
-                label="Заглавие *"
-                value={title}
-                onChange={setTitle}
-                placeholder="Въведете заглавие на документа"
-              />
-              <InputField
-                label="Описание"
-                value={description}
-                onChange={setDescription}
-                placeholder="Въведете описание на документа"
-                multiline={true}
-              />
-            </Section>
+              <ScrollView 
+                style={styles.scrollView} 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollContent}
+              >
+                <Section title="Информация за документа" icon="document-text-outline">
+                  <TitleInput 
+                    value={title} 
+                    onChange={setTitle} 
+                    editable={!isUploading} 
+                  />
+                  <DescriptionInput 
+                    value={description} 
+                    onChange={setDescription} 
+                    editable={!isUploading} 
+                  />
+                </Section>
 
-            <Section title="Качване на файл" icon="cloud-upload-outline">
-              <View style={styles.uploadArea}>
-                {document ? (
-                  <View style={styles.documentInfo}>
-                    <View style={styles.documentIcon}>
-                      <Ionicons 
-                        name={document.mimeType.includes('pdf') ? 'document-text' : 
-                              document.mimeType.includes('image') ? 'image' : 
-                              document.mimeType.includes('word') ? 'document' :
-                              'document'} 
-                        size={40} 
-                        color="#0347F2" 
-                      />
-                    </View>
-                    <View style={styles.documentDetails}>
-                      <Text style={styles.documentName} numberOfLines={2}>
-                        {document.name}
-                      </Text>
-                      <Text style={styles.documentSize}>
-                        {formatFileSize(document.size)}
-                      </Text>
-                      <Text style={styles.documentType}>
-                        {document.mimeType}
-                      </Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.removeDocumentButton}
-                      onPress={removeDocument}
-                      disabled={isUploading}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#ff4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
+                <DocumentPickerSection 
+                  document={document}
+                  isUploading={isUploading}
+                  onPickDocument={pickDocument}
+                  onRemoveDocument={removeDocument}
+                  formatFileSize={formatFileSize}
+                />
+
+                <View style={styles.buttonContainer}>
                   <TouchableOpacity 
-                    style={styles.pickButton} 
-                    onPress={pickDocument}
+                    style={[styles.cancelButton, isUploading && styles.disabledButton]}
+                    onPress={handleClose}
                     disabled={isUploading}
                   >
-                    <Ionicons name="cloud-upload-outline" size={48} color="#0347F2" />
-                    <Text style={styles.pickButtonText}>Изберете файл</Text>
-                    <Text style={styles.pickButtonSubtext}>
-                      Поддържани формати: PDF, DOC, DOCX, JPG, PNG
-                    </Text>
+                    <Text style={styles.cancelButtonText}>Отказ</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            </Section>
-
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.cancelButton, isUploading && styles.disabledButton]}
-                onPress={() => setModalVisibility(false)}
-                disabled={isUploading}
-              >
-                <Text style={styles.cancelButtonText}>Отказ</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.submitButton, isUploading && styles.disabledButton]}
-                onPress={handleSubmit}
-                disabled={isUploading || !document || !title.trim()}
-              >
-                {isUploading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Качи</Text>
-                )}
-              </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.submitButton, isUploading && styles.disabledButton]}
+                    onPress={handleSubmit}
+                    disabled={isUploading || !document || !title.trim()}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Качи</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
-          </ScrollView>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -303,6 +374,10 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -344,6 +419,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingBottom: 20,
   },
   section: {
@@ -458,6 +535,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
+    marginTop: 20,
   },
   cancelButton: {
     flex: 1,

@@ -14,13 +14,14 @@ if (!DATABASE_ID || !COLLECTION_ID || !STORAGE_BUCKET_ID || !HISTORY_ARCHIVE_STO
   throw new Error('Missing Appwrite environment variables for user files');
 }
 
-type FileType = 'profile_photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other' | 'history_audio';
+export type FileType = 'profile_photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other' | 'history_audio_covers' | 'history_audio';
 
-const uploadBucketsIds: Record<FileType, string> = {
+export const uploadBucketsIds: Record<FileType, string> = {
   'document': process.env.EXPO_PUBLIC_STORAGE_HISTORY_ARCHIVE_ID || '',
   'profile_photo': process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '',
   'cover_photo': process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '',
   'history_audio': process.env.EXPO_PUBLIC_STORAGE_HISTORY_AUDIO_ARCHIVE_ID || '',
+  'history_audio_covers': process.env.EXPO_PUBLIC_STORAGE_HISTORY_AUDIO_ARCHIVE_COVERS_ID || '',
 
   // these at the bottom are not done yet but to be implemented sooner
   'word_attachment': process.env.EXPO_PUBLIC_STORAGE_WORD_ATTACHMENT_ID || '',
@@ -41,7 +42,9 @@ export interface UserFileData {
   fileUrl?: string;
   title?: string;
   description?: string;
-  period?: string;
+  is_approved: boolean;
+  coverPhotoUrl?: string;
+  coverPhotoId?: string;
 }
 
 interface UploadFileOptions {
@@ -50,7 +53,8 @@ interface UploadFileOptions {
   file: any;
   title?: string;
   description?: string;
-  period?: string;
+  is_approved: boolean;
+  coverPhoto?: any;
 }
 
 export type RNFile = {
@@ -84,6 +88,7 @@ interface UseUserFilesReturn {
   getCoverPhotoUrl: () => string | null;
   hasProfilePhoto: () => boolean;
   hasCoverPhoto: () => boolean;
+  getAllApprovedHistoryArchives: () => Promise<UserFileData[]>;
   resetError: () => void;
   refresh: () => Promise<void>;
 }
@@ -105,6 +110,16 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
    const getHistoryArchiveUrl = useCallback((fileId: string): string => {
 
     return `${endpoint}/storage/buckets/${HISTORY_ARCHIVE_STORAGE_ID}/files/${fileId}/view?project=${projectId}`;
+  }, []);
+
+  const getHistoryAudioUrl = useCallback((fileId: string): string => {
+
+    return `${endpoint}/storage/buckets/${uploadBucketsIds['history_audio']}/files/${fileId}/view?project=${projectId}`;
+  }, []);
+  
+  const getHistoryAudioCoverUrl = useCallback((fileId: string): string => {
+
+    return `${endpoint}/storage/buckets/${uploadBucketsIds['history_audio_covers']}/files/${fileId}/view?project=${projectId}`;
   }, []);
 
   const prepareFileForUpload = useCallback((file: RNFile): RNFile => {
@@ -154,7 +169,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
           fileUrl,
           title: doc.title || '',
           description: doc.description || '',
-          period: doc.period || ''
+          is_approved: true
         };
       });
 
@@ -212,7 +227,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         fileUrl,
         title: doc.title || '',
         description: doc.description || '',
-        period: doc.period || ''
+        is_approved: doc.is_approved || false
       };
 
       return fileData;
@@ -265,17 +280,61 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
     console.log('Upload successful, file ID:', storageResponse.$id);
 
+    let coverPhotoUrl = undefined;
+    let coverPhotoId = undefined;
+
+    if (options.fileType === 'history_audio' && options.coverPhoto) {
+      try {
+        const coverBucketId = uploadBucketsIds['history_audio_covers'];
+        
+        if (!coverBucketId) {
+          console.error('Cover bucket ID is missing');
+          throw new Error('Cover bucket ID is not configured');
+        }
+
+        const coverFileId = ID.unique();
+        console.log('Uploading cover photo to bucket:', coverBucketId);
+        
+        const coverFileForUpload = {
+          uri: options.coverPhoto.uri,
+          name: options.coverPhoto.name || 'cover.jpg',
+          type: options.coverPhoto.type || 'image/jpeg',
+          size: options.coverPhoto.size || 0
+        };
+
+        const coverResponse = await storage.createFile(
+          coverBucketId,
+          coverFileId,
+          coverFileForUpload
+        );
+        
+        coverPhotoId = coverResponse.$id;
+        
+        coverPhotoUrl = getHistoryAudioCoverUrl(coverResponse.$id);
+        
+        console.log('Cover photo uploaded successfully:', coverPhotoId);
+        console.log('Cover photo URL:', coverPhotoUrl);
+        
+      } catch (coverError) {
+        console.error('Error uploading cover photo:', coverError);
+      }
+    }
+
     const databaseData: any = {
       user_id: user_id,
       file_name: options.fileName || fileToUpload.name || 'file.pdf',
       file_type: options.fileType,
       uploaded_by: user_id,
-      file_id: storageResponse.$id
+      file_id: storageResponse.$id,
     };
+
+    if (coverPhotoId) {
+      databaseData.cover_photo_id = coverPhotoId;
+    }
 
     if (options.title) databaseData.title = options.title;
     if (options.description) databaseData.description = options.description;
-    if (options.period) databaseData.period = options.period;
+    if (options.is_approved !== undefined) databaseData.is_approved = options.is_approved;
 
     const databaseResponse = await databases.createDocument(
       DATABASE_ID,
@@ -284,9 +343,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       databaseData
     );
 
-    const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || '';
-    const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '';
-    const fileUrl = `${endpoint}/storage/buckets/${archiveBucketToUploadToId}/files/${storageResponse.$id}/view?project=${projectId}`;
+    const fileUrl = options.fileType === 'document' 
+      ? getHistoryArchiveUrl(storageResponse.$id)
+      : options.fileType === 'history_audio'
+        ? getHistoryAudioUrl(storageResponse.$id)
+        : getFileUrl(storageResponse.$id);
 
     const newFile: UserFileData = {
       user_id: databaseResponse.user_id,
@@ -298,9 +359,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
       createdAt: databaseResponse.$createdAt,
       updatedAt: databaseResponse.$updatedAt,
       fileUrl,
-      title: databaseResponse.title,
-      description: databaseResponse.description,
-      period: databaseResponse.period
+      title: databaseResponse.title || '',
+      description: databaseResponse.description || '',
+      is_approved: databaseResponse.is_approved || false,
+      coverPhotoUrl: coverPhotoUrl, 
+      coverPhotoId: coverPhotoId 
     };
 
     setFiles(prev => [newFile, ...prev]);
@@ -322,21 +385,88 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   } finally {
     setIsUploading(false);
   }
-}, [user_id]);
+}, [user_id, getHistoryAudioCoverUrl, getHistoryArchiveUrl, getHistoryAudioUrl, getFileUrl]);
 
   const uploadHistoryArchive = useCallback(async (options: UploadFileOptions): Promise<UserFileData> => {
     return uploadFile({
       ...options,
-      fileType: 'document'
+      fileType: 'document',
+      is_approved: false,
     });
   }, [uploadFile]);
 
   const uploadHistoryAudioArchive = useCallback(async (options: UploadFileOptions): Promise<UserFileData> => {
     return uploadFile({
       ...options,
-      fileType: 'history_audio'
+      fileType: 'history_audio',
+      is_approved: false
     });
   }, [uploadFile]);
+
+const getAllApprovedHistoryArchives = useCallback(async (): Promise<UserFileData[]> => {
+  try {
+    setError(null);
+    
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTION_ID,
+      [
+        Query.equal('file_type', ['document', 'history_audio']),
+        Query.equal('is_approved', true), 
+        Query.orderDesc('$createdAt')
+      ]
+    );
+
+    const approvedFiles: UserFileData[] = await Promise.all(response.documents.map(async (doc) => {
+      let fileUrl = undefined;
+      let coverPhotoUrl = undefined;
+      let coverPhotoId = undefined;
+      
+      try {
+        if (doc.file_type === 'document') {
+          fileUrl = getHistoryArchiveUrl(doc.file_id);
+        } else if (doc.file_type === 'history_audio') {
+          fileUrl = getHistoryAudioUrl(doc.file_id);
+          
+          if (doc.cover_photo_id) {
+            coverPhotoId = doc.cover_photo_id;
+            coverPhotoUrl = getHistoryAudioCoverUrl(doc.cover_photo_id);
+          } else if (doc.coverPhotoId) {
+            coverPhotoId = doc.coverPhotoId;
+            coverPhotoUrl = getHistoryAudioCoverUrl(doc.coverPhotoId);
+          }
+        }
+      } catch (err) {
+        console.error('Error getting file URL:', err);
+      }
+
+      return {
+        user_id: doc.user_id,
+        file_name: doc.file_name,
+        file_type: doc.file_type,
+        uploaded_by: doc.uploaded_by,
+        file_id: doc.file_id,
+        $id: doc.$id,
+        createdAt: doc.$createdAt,
+        updatedAt: doc.$updatedAt,
+        fileUrl,
+        title: doc.title || '',
+        description: doc.description || '',
+        is_approved: doc.is_approved || false,
+        coverPhotoUrl: coverPhotoUrl,
+        coverPhotoId: coverPhotoId
+      };
+    }));
+
+    return approvedFiles;
+
+  } catch (err) {
+    const appwriteError = err as AppwriteException;
+    console.error('Error fetching approved history archives:', appwriteError.message);
+    setError(appwriteError);
+    throw err;
+  }
+}, [getHistoryArchiveUrl, getHistoryAudioUrl, getHistoryAudioCoverUrl]);
 
   const deleteFile = useCallback(async (fileDocumentId: string, storageFileId: string): Promise<void> => {
     try {
@@ -390,6 +520,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     return uploadFile({
       fileName: `profile_${user_id}_${Date.now()}.jpg`,
       fileType: 'profile_photo',
+      is_approved: true,
       file
     });
   }, [user_id, uploadFile]);
@@ -398,6 +529,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     return uploadFile({
       fileName: `cover_${user_id}_${Date.now()}.jpg`,
       fileType: 'cover_photo',
+      is_approved: true,
       file
     });
   }, [user_id, uploadFile]);
@@ -468,6 +600,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     getCoverPhotoUrl,
     hasProfilePhoto,
     hasCoverPhoto,
+    getAllApprovedHistoryArchives,
     resetError,
     refresh
   };

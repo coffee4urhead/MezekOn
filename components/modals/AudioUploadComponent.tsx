@@ -2,18 +2,192 @@ import { useUser } from '@/context/UserContext';
 import { useUserFiles } from '@/hooks/use-user-files';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { Dispatch, SetStateAction, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import { Dispatch, memo, SetStateAction, useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
+
+
+const TitleInput = memo(({ 
+  value, 
+  onChange, 
+  editable 
+}: { 
+  value: string; 
+  onChange: (text: string) => void; 
+  editable: boolean;
+}) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.inputLabel}>Заглавие *</Text>
+    <TextInput
+      style={styles.input}
+      value={value}
+      onChangeText={onChange}
+      placeholder="Въведете заглавие на аудио файла"
+      placeholderTextColor="#999"
+      editable={editable}
+      scrollEnabled={false}
+      returnKeyType="done"
+      blurOnSubmit={true}
+    />
+  </View>
+));
+
+const DescriptionInput = memo(({ 
+  value, 
+  onChange, 
+  editable 
+}: { 
+  value: string; 
+  onChange: (text: string) => void; 
+  editable: boolean;
+}) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.inputLabel}>Описание</Text>
+    <TextInput
+      style={[styles.input, styles.textArea]}
+      value={value}
+      onChangeText={onChange}
+      placeholder="Въведете описание на аудио файла"
+      placeholderTextColor="#999"
+      multiline={true}
+      numberOfLines={4}
+      editable={editable}
+      scrollEnabled={false}
+      returnKeyType="default"
+      blurOnSubmit={true}
+      textAlignVertical="top"
+    />
+  </View>
+));
+
+
+const AudioPickerSection = memo(({ 
+  audio, 
+  isUploading, 
+  onPickAudio, 
+  onRemoveAudio,
+  formatFileSize,
+  getAudioIcon
+}: any) => (
+  <Section title="Качване на аудио файл" icon="cloud-upload-outline">
+    <View style={styles.uploadArea}>
+      {audio ? (
+        <View style={styles.audioInfo}>
+          <View style={styles.audioIcon}>
+            <Ionicons 
+              name={getAudioIcon(audio.mimeType)} 
+              size={40} 
+              color="#0347F2" 
+            />
+          </View>
+          <View style={styles.audioDetails}>
+            <Text style={styles.audioName} numberOfLines={2}>
+              {audio.name}
+            </Text>
+            <Text style={styles.audioSize}>
+              {formatFileSize(audio.size)}
+            </Text>
+            <Text style={styles.audioType}>
+              {audio.mimeType}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.removeButton}
+            onPress={onRemoveAudio}
+            disabled={isUploading}
+          >
+            <Ionicons name="close-circle" size={24} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.pickButton} 
+          onPress={onPickAudio}
+          disabled={isUploading}
+        >
+          <Ionicons name="musical-notes-outline" size={48} color="#0347F2" />
+          <Text style={styles.pickButtonText}>Изберете аудио файл</Text>
+          <Text style={styles.pickButtonSubtext}>
+            Поддържани формати: MP3, M4A, WAV, AAC, FLAC, OGG, WEBM, AMR, WMA
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </Section>
+));
+
+const CoverPickerSection = memo(({ 
+  coverPhoto, 
+  isUploading, 
+  onPickCover, 
+  onRemoveCover,
+  formatFileSize
+}: any) => (
+  <Section title="Корица на аудиото (опционално)" icon="image-outline">
+    <View style={styles.uploadArea}>
+      {coverPhoto ? (
+        <View style={styles.coverInfo}>
+          <Image 
+            source={{ uri: coverPhoto.uri }} 
+            style={styles.coverPreview}
+          />
+          <View style={styles.coverDetails}>
+            <Text style={styles.coverName} numberOfLines={2}>
+              {coverPhoto.name}
+            </Text>
+            <Text style={styles.coverSize}>
+              {formatFileSize(coverPhoto.size)}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.removeButton}
+            onPress={onRemoveCover}
+            disabled={isUploading}
+          >
+            <Ionicons name="close-circle" size={24} color="#ff4444" />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.pickCoverButton} 
+          onPress={onPickCover}
+          disabled={isUploading}
+        >
+          <Ionicons name="image-outline" size={40} color="#0347F2" />
+          <Text style={styles.pickCoverText}>Изберете корица</Text>
+          <Text style={styles.pickCoverSubtext}>
+            Препоръчителен размер: 500x500px
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </Section>
+));
+
+const Section = memo(({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <Ionicons name={icon as any} size={20} color="#0347F2" />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    <View style={styles.sectionContent}>{children}</View>
+  </View>
+));
 
 interface UploadAudioProps {
     isModalClicked: boolean;
@@ -28,43 +202,34 @@ interface AudioAsset {
     duration?: number;
 }
 
+interface CoverPhotoAsset {
+    uri: string;
+    name: string;
+    size: number;
+    type: string;
+}
+
 export default function UploadAudio({ isModalClicked, setModalVisibility }: UploadAudioProps) {
   const { user } = useUser();
-  const { uploadHistoryAudioArchive, isUploading: isHookUploading } = useUserFiles(user?.$id || '');
+  const { uploadHistoryAudioArchive } = useUserFiles(user?.$id || '');
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [audio, setAudio] = useState<AudioAsset | null>(null);
+  const [coverPhoto, setCoverPhoto] = useState<CoverPhotoAsset | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const supportedAudioTypes = [
-    'audio/mpeg',      
-    'audio/mp4',      
-    'audio/wav',       
-    'audio/aac',      
-    'audio/flac',      
-    'audio/ogg',       
-    'audio/webm',      
-    'audio/amr',       
-    'audio/m4a',       
-    'audio/x-m4a',     
-    'audio/x-mp3',     
-    'audio/x-wav',    
-    'audio/x-aac',    
-    'audio/x-flac',    
-    'audio/x-ogg',     
-    'audio/x-ms-wma',  
-  ];
+  const audioFileExtensions = ['mp3', 'mp4', 'wav', 'aac', 'flac', 'ogg', 'webm', 'amr', 'm4a', 'wma'];
 
-  const audioFileExtensions = [
-    'mp3', 'mp4', 'wav', 'aac', 'flac', 
-    'ogg', 'webm', 'amr', 'm4a', 'wma'
-  ];
-
-  const pickAudio = async () => {
+  const pickAudio = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: supportedAudioTypes,
+        type: [
+          'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/aac', 
+          'audio/flac', 'audio/ogg', 'audio/webm', 'audio/amr', 
+          'audio/m4a', 'audio/x-m4a', 'audio/x-mp3', 'audio/x-wav',
+          'audio/x-aac', 'audio/x-flac', 'audio/x-ogg', 'audio/x-ms-wma',
+        ],
         copyToCacheDirectory: true,
         multiple: false
       });
@@ -82,21 +247,56 @@ export default function UploadAudio({ isModalClicked, setModalVisibility }: Uplo
       console.error('Error picking audio:', error);
       Alert.alert('Грешка', 'Възникна проблем при избора на аудио файл.');
     }
-  };
+  }, []);
 
-  const removeAudio = () => {
+  const pickCoverPhoto = useCallback(async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Грешка', 'Нужни са разрешения за достъп до галерията.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        setCoverPhoto({
+          uri: asset.uri,
+          name: asset.fileName || 'cover.jpg',
+          size: asset.fileSize || 0,
+          type: asset.mimeType || 'image/jpeg',
+        });
+      }
+    } catch (error) {
+      console.error('Error picking cover photo:', error);
+      Alert.alert('Грешка', 'Възникна проблем при избора на корица.');
+    }
+  }, []);
+
+  const removeAudio = useCallback(() => {
     setAudio(null);
-  };
+  }, []);
 
-  const formatFileSize = (bytes: number) => {
+  const removeCoverPhoto = useCallback(() => {
+    setCoverPhoto(null);
+  }, []);
+
+  const formatFileSize = useCallback((bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
+  }, []);
 
-  const getAudioIcon = (mimeType: string): string => {
+  const getAudioIcon = useCallback((mimeType: string): string => {
     if (mimeType.includes('mp3') || mimeType.includes('mpeg')) return 'musical-notes';
     if (mimeType.includes('wav')) return 'musical-note';
     if (mimeType.includes('aac') || mimeType.includes('m4a')) return 'musical-note';
@@ -104,9 +304,16 @@ export default function UploadAudio({ isModalClicked, setModalVisibility }: Uplo
     if (mimeType.includes('ogg')) return 'musical-note';
     if (mimeType.includes('wma')) return 'musical-note';
     return 'musical-notes';
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setAudio(null);
+    setCoverPhoto(null);
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
     if (!title.trim()) {
       Alert.alert('Грешка', 'Моля, въведете заглавие.');
       return;
@@ -132,18 +339,25 @@ export default function UploadAudio({ isModalClicked, setModalVisibility }: Uplo
         size: audio.size
       };
 
-      console.log('Starting audio upload with user ID:', user.$id);
-      console.log('Audio file to upload:', fileToUpload);
-
-      const result = await uploadHistoryAudioArchive({
+      const uploadOptions: any = {
         fileName: audio.name,
         fileType: 'history_audio', 
         file: fileToUpload,
         title: title,
         description: description,
-      });
+        is_approved: false
+      };
 
-      console.log('Audio upload successful:', result);
+      if (coverPhoto) {
+        uploadOptions.coverPhoto = {
+          uri: coverPhoto.uri,
+          name: coverPhoto.name,
+          type: coverPhoto.type,
+          size: coverPhoto.size
+        };
+      }
+
+      await uploadHistoryAudioArchive(uploadOptions);
       
       Alert.alert(
         'Успех', 
@@ -178,155 +392,107 @@ export default function UploadAudio({ isModalClicked, setModalVisibility }: Uplo
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [title, audio, coverPhoto, user, uploadHistoryAudioArchive, resetForm, setModalVisibility]);
 
-  const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setAudio(null);
-  };
-
-  const Section = ({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Ionicons name={icon as any} size={20} color="#0347F2" />
-        <Text style={styles.sectionTitle}>{title}</Text>
-      </View>
-      <View style={styles.sectionContent}>{children}</View>
-    </View>
-  );
-
-  const InputField = ({ label, value, onChange, placeholder, multiline = false, keyboardType = 'default' }: any) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={[styles.input, multiline && styles.textArea]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#999"
-        multiline={multiline}
-        numberOfLines={multiline ? 4 : 1}
-        keyboardType={keyboardType}
-        editable={!isUploading}
-      />
-    </View>
-  );
+  const handleClose = useCallback(() => {
+    if (!isUploading) {
+      Keyboard.dismiss();
+      setModalVisibility(false);
+    }
+  }, [isUploading, setModalVisibility]);
 
   return (
     <Modal
       animationType="slide"
       transparent={true}
       visible={isModalClicked}
-      onRequestClose={() => {
-        if (!isUploading) setModalVisibility(false);
-      }}
+      onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Качи аудио файл</Text>
-              <Text style={styles.headerSubtitle}>
-                Качвай аудио записи, свързани с българската история и култура
-              </Text>
-            </View>
-            <TouchableOpacity 
-              onPress={() => !isUploading && setModalVisibility(false)} 
-              style={styles.closeButton}
-              disabled={isUploading}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.overlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardAvoidingView}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.header}>
+                <View style={styles.headerContent}>
+                  <Text style={styles.headerTitle}>Качи аудио файл</Text>
+                  <Text style={styles.headerSubtitle}>
+                    Качвай аудио записи, свързани с българската история и култура
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={handleClose} 
+                  style={styles.closeButton}
+                  disabled={isUploading}
+                >
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <Section title="Информация за аудиото" icon="information-circle-outline">
-              <InputField
-                label="Заглавие *"
-                value={title}
-                onChange={setTitle}
-                placeholder="Въведете заглавие на аудио файла"
-              />
-              <InputField
-                label="Описание"
-                value={description}
-                onChange={setDescription}
-                placeholder="Въведете описание на аудио файла"
-                multiline={true}
-              />
-            </Section>
+              <ScrollView 
+                style={styles.scrollView} 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollContent}
+              >
+                <Section title="Информация за аудиото" icon="information-circle-outline">
+                  <TitleInput 
+                    value={title} 
+                    onChange={setTitle} 
+                    editable={!isUploading} 
+                  />
+                  <DescriptionInput 
+                    value={description} 
+                    onChange={setDescription} 
+                    editable={!isUploading} 
+                  />
+                </Section>
 
-            <Section title="Качване на аудио файл" icon="cloud-upload-outline">
-              <View style={styles.uploadArea}>
-                {audio ? (
-                  <View style={styles.audioInfo}>
-                    <View style={styles.audioIcon}>
-                      <Ionicons 
-                        name={getAudioIcon(audio.mimeType) as any} 
-                        size={40} 
-                        color="#0347F2" 
-                      />
-                    </View>
-                    <View style={styles.audioDetails}>
-                      <Text style={styles.audioName} numberOfLines={2}>
-                        {audio.name}
-                      </Text>
-                      <Text style={styles.audioSize}>
-                        {formatFileSize(audio.size)}
-                      </Text>
-                      <Text style={styles.audioType}>
-                        {audio.mimeType}
-                      </Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.removeAudioButton}
-                      onPress={removeAudio}
-                      disabled={isUploading}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#ff4444" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
+                <AudioPickerSection 
+                  audio={audio}
+                  isUploading={isUploading}
+                  onPickAudio={pickAudio}
+                  onRemoveAudio={removeAudio}
+                  formatFileSize={formatFileSize}
+                  getAudioIcon={getAudioIcon}
+                />
+
+                <CoverPickerSection 
+                  coverPhoto={coverPhoto}
+                  isUploading={isUploading}
+                  onPickCover={pickCoverPhoto}
+                  onRemoveCover={removeCoverPhoto}
+                  formatFileSize={formatFileSize}
+                />
+
+                <View style={styles.buttonContainer}>
                   <TouchableOpacity 
-                    style={styles.pickButton} 
-                    onPress={pickAudio}
+                    style={[styles.cancelButton, isUploading && styles.disabledButton]}
+                    onPress={handleClose}
                     disabled={isUploading}
                   >
-                    <Ionicons name="musical-notes-outline" size={48} color="#0347F2" />
-                    <Text style={styles.pickButtonText}>Изберете аудио файл</Text>
-                    <Text style={styles.pickButtonSubtext}>
-                      Поддържани формати: {audioFileExtensions.join(', ').toUpperCase()}
-                    </Text>
+                    <Text style={styles.cancelButtonText}>Отказ</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            </Section>
-
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.cancelButton, isUploading && styles.disabledButton]}
-                onPress={() => setModalVisibility(false)}
-                disabled={isUploading}
-              >
-                <Text style={styles.cancelButtonText}>Отказ</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.submitButton, isUploading && styles.disabledButton]}
-                onPress={handleSubmit}
-                disabled={isUploading || !audio || !title.trim()}
-              >
-                {isUploading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Качи</Text>
-                )}
-              </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.submitButton, isUploading && styles.disabledButton]}
+                    onPress={handleSubmit}
+                    disabled={isUploading || !audio || !title.trim()}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Качи</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
-          </ScrollView>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -335,6 +501,10 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -376,6 +546,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingBottom: 20,
   },
   section: {
@@ -445,6 +617,28 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+  pickCoverButton: {
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fafafa',
+    minHeight: 100,
+  },
+  pickCoverText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0347F2',
+    marginTop: 8,
+  },
+  pickCoverSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
   audioInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,7 +675,35 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 2,
   },
-  removeAudioButton: {
+  coverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9ff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#0347F2',
+  },
+  coverPreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  coverDetails: {
+    flex: 1,
+  },
+  coverName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
+  coverSize: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  removeButton: {
     padding: 4,
   },
   buttonContainer: {
@@ -490,6 +712,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
+    marginTop: 20,
   },
   cancelButton: {
     flex: 1,
