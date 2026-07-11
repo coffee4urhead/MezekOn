@@ -37,7 +37,6 @@ export default function PDFViewerScreen() {
     }
   };
 
-  // Use Google Docs Viewer for PDFs
   const pdfUrl = `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(fileUrl)}`;
 
   return (
