@@ -2,9 +2,9 @@ import ThemeToggleButton from '@/components/CustomHeader';
 import FilterModal, { FilterOptions } from '@/components/FilterModal';
 import { useTheme } from '@/context/ThemeContext';
 import { databases } from '@/hooks/appwrite';
-import { Query } from 'appwrite';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Query } from 'react-native-appwrite';
 import { BulgarianAlphabet, DictionaryWord, DictionaryWordMeaning, mappingWordClass, WordWithMeanings } from '../../types/word-types-and-maps';
 
 export default function DictionaryScreen() {

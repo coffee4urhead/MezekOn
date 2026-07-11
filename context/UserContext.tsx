@@ -1,8 +1,8 @@
 import { client } from '@/hooks/appwrite';
 import { UserRole, UserRoleData, useUserRoles } from '@/hooks/use-user-roles';
 import { checkCurrentSession } from '@/scripts/util';
-import { Account, ID } from 'appwrite';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Account, ID } from 'react-native-appwrite';
 
 interface User {
   $id: string;

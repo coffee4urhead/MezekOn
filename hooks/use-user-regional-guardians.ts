@@ -1,5 +1,5 @@
-import { AppwriteException, Query } from 'appwrite';
 import { useCallback, useEffect, useState } from 'react';
+import { AppwriteException, Query } from 'react-native-appwrite';
 import { databases } from './appwrite';
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
