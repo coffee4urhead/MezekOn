@@ -1,7 +1,9 @@
+// components/previews/PDFArchivePreview.tsx
 import { FileType, UserFileData } from '@/hooks/use-user-files';
 import { usePDFThumbnail } from '@/hooks/usePDFThumbnail';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 
 interface FilePreviewItemProps {
   file: UserFileData;
@@ -14,6 +16,8 @@ const FilePreviewItem = ({
   fileTypesLookingFor = ['document', 'history_audio'], 
   onPress 
 }: FilePreviewItemProps) => {
+  const navigation = useNavigation();
+  
   const { 
     thumbnailPath, 
     isLoading: isThumbnailLoading, 
@@ -23,6 +27,50 @@ const FilePreviewItem = ({
     file.file_type === 'document' ? file.fileUrl || '' : '',
     file.file_type === 'document' ? 'document' : ''
   );
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress(file);
+      return;
+    }
+
+    if (file.file_type === 'document' && file.fileUrl) {
+      try {
+        // Use CommonActions to navigate from the root
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'PDFViewerScreen',
+            params: {
+              fileUrl: file.fileUrl,
+              fileName: file.file_name || file.title || 'Untitled',
+              fileId: file.file_id,
+            },
+          })
+        );
+      } catch (error) {
+        console.error('Navigation error:', error);
+        Alert.alert('Грешка', 'Не може да се отвори PDF файлът.');
+      }
+    } else if (file.file_type === 'history_audio' && file.fileUrl) {
+      try {
+        // Use CommonActions to navigate from the root
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: 'AudioPlayerScreen',
+            params: {
+              fileUrl: file.fileUrl,
+              fileName: file.file_name || file.title || 'Untitled',
+              fileId: file.file_id,
+              coverPhotoUrl: file.coverPhotoUrl,
+            },
+          })
+        );
+      } catch (error) {
+        console.error('Navigation error:', error);
+        Alert.alert('Грешка', 'Не може да се отвори аудио файлът.');
+      }
+    }
+  };
 
   const getPreviewUrl = () => {
     if (file.file_type === 'document' && thumbnailPath) {
@@ -99,7 +147,7 @@ const FilePreviewItem = ({
         >
           <ActivityIndicator size="large" color="#0347F2" />
           <Text style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-            Loading preview...
+            Зареждане...
           </Text>
         </View>
       );
@@ -150,7 +198,7 @@ const FilePreviewItem = ({
   return (
     <TouchableOpacity 
       style={{ margin: 5, alignItems: 'center', width: 150 }}
-      onPress={() => onPress?.(file)}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       {renderContent()}
@@ -183,7 +231,7 @@ const FilePreviewItem = ({
           borderRadius: 12,
           marginTop: 2
         }}>
-          <Text style={{ color: 'white', fontSize: 10 }}>Approved</Text>
+          <Text style={{ color: 'white', fontSize: 10 }}>Одобрен</Text>
         </View>
       )}
     </TouchableOpacity>

@@ -1,3 +1,4 @@
+// app/_layout.tsx
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,15 +19,32 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <UserProvider>
-      <ThemeProvider>
-        <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </NavigationThemeProvider>
-      </ThemeProvider>
+        <ThemeProvider>
+          <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen 
+                name="PDFViewerScreen" 
+                options={{ 
+                  presentation: 'modal',
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen 
+                name="AudioPlayerScreen" 
+                options={{ 
+                  presentation: 'modal',
+                  headerShown: false,
+                }}
+              />
+            </Stack>
+            <StatusBar style="auto" />
+          </NavigationThemeProvider>
+        </ThemeProvider>
       </UserProvider>
     </SafeAreaProvider>
   );
