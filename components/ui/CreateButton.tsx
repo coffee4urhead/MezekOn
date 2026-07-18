@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Popover, { PopoverPlacement } from 'react-native-popover-view';
 import UploadAudio from '../modals/AudioUploadComponent';
+import CreateAnnouncement from '../modals/CreateAnnouncement';
+import CreateEvent from '../modals/CreateEvent';
 import UploadHistoryArchive from '../modals/HistoryUploadArchive';
 
 export enum CreationScreen {
@@ -32,6 +34,12 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
       case "Add Audio":
         setOptionModalVisibilty(true);
         break;
+      case 'Add Event':
+        setOptionModalVisibilty(true);
+        break;
+      case 'Add Announcement':
+        setOptionModalVisibilty(true);
+        break;
       default:
         console.log("Something went wrong! Wrong option pressed!");
         break;
@@ -56,7 +64,6 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
         return [
           { id: 'add_event', label: '📅 Добави събитие', action: 'Add Event' },
           { id: 'add_announcement', label: '📢 Добави обявление', action: 'Add Announcement' },
-          { id: 'add_gallery', label: '🖼️ Добави галерия', action: 'Add Gallery' },
         ];
       
       default:
@@ -85,6 +92,17 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
           setModalVisibility={setOptionModalVisibilty}
         />
       );
+      case 'Add Event':
+        return (
+        <CreateEvent
+          isVisible={optionModalUploadVisible}
+          setModalVisibility={setOptionModalVisibilty}
+        />);
+      case 'Add Announcement':
+        return ( <CreateAnnouncement
+        isVisible={optionModalUploadVisible}
+        setModalVisibility={setOptionModalVisibilty}
+        />);
       default:
         return null;
     }
