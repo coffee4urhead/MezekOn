@@ -14,7 +14,7 @@ if (!DATABASE_ID || !COLLECTION_ID || !STORAGE_BUCKET_ID || !HISTORY_ARCHIVE_STO
   throw new Error('Missing Appwrite environment variables for user files');
 }
 
-export type FileType = 'profile_photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other' | 'history_audio_covers' | 'history_audio';
+export type FileType = 'profile_photo' | 'event-cover-photo' | 'cover_photo' | 'word_attachment' | 'pronunciation_audio' | 'evidence_photo' | 'document' | 'other' | 'history_audio_covers' | 'history_audio';
 
 export const uploadBucketsIds: Record<FileType, string> = {
   'document': process.env.EXPO_PUBLIC_STORAGE_HISTORY_ARCHIVE_ID || '',
@@ -22,6 +22,7 @@ export const uploadBucketsIds: Record<FileType, string> = {
   'cover_photo': process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '',
   'history_audio': process.env.EXPO_PUBLIC_STORAGE_HISTORY_AUDIO_ARCHIVE_ID || '',
   'history_audio_covers': process.env.EXPO_PUBLIC_STORAGE_HISTORY_AUDIO_ARCHIVE_COVERS_ID || '',
+  'event-cover-photo': process.env.EXPO_PUBLIC_STORAGE_EVENT_COVER_PHOTOS_ID || '',
 
   // these at the bottom are not done yet but to be implemented sooner
   'word_attachment': process.env.EXPO_PUBLIC_STORAGE_WORD_ATTACHMENT_ID || '',
@@ -77,6 +78,7 @@ interface UseUserFilesReturn {
   uploadFile: (options: UploadFileOptions) => Promise<UserFileData>;
   uploadHistoryArchive: (options: UploadFileOptions) => Promise<UserFileData>;
   uploadHistoryAudioArchive: (options: UploadFileOptions) => Promise<UserFileData>;
+  uploadEventCoverPhoto: (options: UploadFileOptions) => Promise<UserFileData>;
   deleteFile: (fileDocumentId: string, storageFileId: string) => Promise<void>;
   deleteProfilePhoto: () => Promise<void>;
   deleteCoverPhoto: () => Promise<void>;
@@ -120,6 +122,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   const getHistoryAudioCoverUrl = useCallback((fileId: string): string => {
 
     return `${endpoint}/storage/buckets/${uploadBucketsIds['history_audio_covers']}/files/${fileId}/view?project=${projectId}`;
+  }, []);
+
+  const getEventCoverUrl = useCallback((fileId: string): string => {
+
+    return `${endpoint}/storage/buckets/${uploadBucketsIds['event-cover-photo']}/files/${fileId}/view?project=${projectId}`;
   }, []);
 
   const prepareFileForUpload = useCallback((file: RNFile): RNFile => {
@@ -403,6 +410,14 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     });
   }, [uploadFile]);
 
+  const uploadEventCoverPhoto = useCallback(async (options: UploadFileOptions): Promise<UserFileData> => {
+    return uploadFile({
+      ...options,
+      fileType: 'event-cover-photo',
+      is_approved: false
+    });
+  }, [uploadFile]);
+
 const getAllApprovedHistoryArchives = useCallback(async (): Promise<UserFileData[]> => {
   try {
     setError(null);
@@ -589,6 +604,7 @@ const getAllApprovedHistoryArchives = useCallback(async (): Promise<UserFileData
     uploadFile,
     uploadHistoryArchive,
     uploadHistoryAudioArchive,
+    uploadEventCoverPhoto,
     deleteFile,
     deleteProfilePhoto,
     deleteCoverPhoto,
