@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Popover, { PopoverPlacement } from 'react-native-popover-view';
 import UploadAudio from '../modals/AudioUploadComponent';
+import CreateAnnouncement from '../modals/CreateAnnouncement';
 import CreateEvent from '../modals/CreateEvent';
 import UploadHistoryArchive from '../modals/HistoryUploadArchive';
 
@@ -98,7 +99,10 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
           setModalVisibility={setOptionModalVisibilty}
         />);
       case 'Add Announcement':
-        break;
+        return ( <CreateAnnouncement
+        isVisible={optionModalUploadVisible}
+        setModalVisibility={setOptionModalVisibilty}
+        />);
       default:
         return null;
     }

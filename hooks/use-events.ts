@@ -445,10 +445,13 @@ export function useEvents(initialEventId?: string): UseEventsReturn {
 
       const now = new Date().toISOString();
       const queries: any[] = [
+      Query.or([
         Query.equal('status', 'incoming'),
-        Query.greaterThan('eventStartDate', now),
-        Query.orderAsc('eventStartDate')
-      ];
+        Query.equal('status', 'active')
+      ]),
+      Query.greaterThan('eventEndDate', now), 
+      Query.orderAsc('eventStartDate')
+    ];
 
       if (limit) {
         queries.push(Query.limit(limit));
