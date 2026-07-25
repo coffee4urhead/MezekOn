@@ -179,19 +179,6 @@ export default function Events() {
           )}
         </View>
 
-        {allEvents.length > 0 && upcomingEvents.length === 0 && pastEvents.length === 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              📋 Всички събития
-            </Text>
-            <View style={styles.eventsList}>
-              {allEvents.map((event) => (
-                <EventCard key={event.$id} {...event} />
-              ))}
-            </View>
-          </View>
-        )}
-
       </ScrollView>
       <CreateButton creationScreen={CreationScreen.Events}/>
     </View>
