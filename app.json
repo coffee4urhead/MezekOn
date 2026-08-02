@@ -1,8 +1,13 @@
 {
   "expo": {
     "name": "MezekOn",
-    "slug": "MezekOn",
+    "slug": "mezekon",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "f000b2df-340f-4f86-8abf-9255d83e0cbc"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mezekon",
@@ -19,13 +24,14 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mikhail_app_dev.mezekon"
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-"plugins": [
+    "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
@@ -51,6 +57,16 @@
               "cropToolbarColor": "#000000"
             }
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icons/main-feed.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/mezekon_not.wav"
+          ]
         }
       ]
     ],

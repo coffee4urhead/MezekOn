@@ -1,6 +1,7 @@
 import ThemeToggleButton from '@/components/CustomHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -24,7 +25,8 @@ export default function HomeScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const PlaceholderImage = require('@/assets/icons/logo.png');
-
+  useNotifications();
+  
   useEffect(() => {
     setConfirmPassword('');
   }, [showLogin]);
