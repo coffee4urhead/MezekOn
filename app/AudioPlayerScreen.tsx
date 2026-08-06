@@ -1,9 +1,9 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { useNavigation, useRoute } from '@react-navigation/native';
 import { Audio } from 'expo-av';
-import React, { useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useNavigation, useRoute } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -25,12 +25,12 @@ export default function AudioPlayerScreen() {
   const route = useRoute();
   const { isDark } = useTheme();
   
-  const params = route.params as {
-    fileUrl: string;
-    fileName: string;
-    fileId: string;
-    coverPhotoUrl?: string;
-  };
+  const params = useLocalSearchParams<{
+  fileUrl: string;
+  fileName: string;
+  fileId: string;
+  coverPhotoUrl?: string;
+}>();
   
   const { fileUrl, fileName, fileId, coverPhotoUrl } = params;
   

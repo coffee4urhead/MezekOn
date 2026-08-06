@@ -26,8 +26,8 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.mikhail_app_dev.mezekon",
       "permissions": [
-    "RECORD_AUDIO"
-  ]
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -48,19 +48,23 @@
         }
       ],
       [
-       "expo-build-properties",
-    {
-      "android": {
-        "compileSdkVersion": 36,
-        "targetSdkVersion": 36,
-        "buildToolsVersion": "36.0.0",
-        "kotlinVersion": "2.1.20"
-      },
-      "ios": {
-        "deploymentTarget": "16.4"
-      }
-    }
-  ],
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "kotlinVersion": "2.1.20",
+            "ndkVersion": "26.1.10909125",
+            "minSdkVersion": 24,
+            "gradleVersion": "8.6",
+            "enableHermes": false
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -84,7 +88,8 @@
             "./assets/mezekon_not.wav"
           ]
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

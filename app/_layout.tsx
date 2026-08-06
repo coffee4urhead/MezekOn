@@ -1,5 +1,4 @@
 // app/_layout.tsx
-import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -20,30 +19,29 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <UserProvider>
         <ThemeProvider>
-          <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack
-              screenOptions={{
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              navigationBarColor: colorScheme === 'dark' ? '#000000' : '#ffffff',
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen 
+              name="PDFViewerScreen" 
+              options={{ 
+                presentation: 'modal',
                 headerShown: false,
               }}
-            >
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen 
-                name="PDFViewerScreen" 
-                options={{ 
-                  presentation: 'modal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen 
-                name="AudioPlayerScreen" 
-                options={{ 
-                  presentation: 'modal',
-                  headerShown: false,
-                }}
-              />
-            </Stack>
-            <StatusBar style="auto" />
-          </NavigationThemeProvider>
+            />
+            <Stack.Screen 
+              name="AudioPlayerScreen" 
+              options={{ 
+                presentation: 'modal',
+                headerShown: false,
+              }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
         </ThemeProvider>
       </UserProvider>
     </SafeAreaProvider>
