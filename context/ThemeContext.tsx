@@ -13,7 +13,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const deviceTheme = useDeviceColorScheme();
-  const [theme, setTheme] = useState<ThemeType>(deviceTheme || 'light');
+  const initialTheme: ThemeType = deviceTheme === 'dark' ? 'dark' : 'light';
+  const [theme, setTheme] = useState<ThemeType>(initialTheme);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');

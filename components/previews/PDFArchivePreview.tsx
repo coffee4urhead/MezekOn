@@ -1,7 +1,7 @@
 // components/previews/PDFArchivePreview.tsx
 import { FileType, UserFileData } from '@/hooks/use-user-files';
 import { usePDFThumbnail } from '@/hooks/usePDFThumbnail';
-import { CommonActions, useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from "expo-router/react-navigation";
 import React from 'react';
 import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 

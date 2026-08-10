@@ -4,7 +4,7 @@ import Events from '@/components/main-feed-tabs/Events';
 import History from '@/components/main-feed-tabs/History';
 import News from '@/components/main-feed-tabs/News';
 import { useTheme } from '@/context/ThemeContext';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createMaterialTopTabNavigator } from "expo-router/js-top-tabs";
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, StyleSheet } from 'react-native';
 
