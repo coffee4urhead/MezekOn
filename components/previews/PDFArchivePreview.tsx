@@ -1,8 +1,6 @@
-// components/previews/PDFArchivePreview.tsx
 import { FileType, UserFileData } from '@/hooks/use-user-files';
 import { usePDFThumbnail } from '@/hooks/usePDFThumbnail';
 import { CommonActions, useNavigation } from "expo-router/react-navigation";
-import React from 'react';
 import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 
 interface FilePreviewItemProps {
@@ -36,7 +34,6 @@ const FilePreviewItem = ({
 
     if (file.file_type === 'document' && file.fileUrl) {
       try {
-        // Use CommonActions to navigate from the root
         navigation.dispatch(
           CommonActions.navigate({
             name: 'PDFViewerScreen',
@@ -53,7 +50,6 @@ const FilePreviewItem = ({
       }
     } else if (file.file_type === 'history_audio' && file.fileUrl) {
       try {
-        // Use CommonActions to navigate from the root
         navigation.dispatch(
           CommonActions.navigate({
             name: 'AudioPlayerScreen',
