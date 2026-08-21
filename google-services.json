@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "798470917408",
+    "project_id": "mezekon-bf9f3",
+    "storage_bucket": "mezekon-bf9f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798470917408:android:79c4bc25b743a26f7c5b45",
+        "android_client_info": {
+          "package_name": "mezek.on"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8392dHR_AL3UuIj9QruY31bvd-v2fcT4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

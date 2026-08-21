@@ -1,15 +1,20 @@
 {
   "expo": {
     "name": "MezekOn",
-    "slug": "MezekOn",
+    "slug": "mezekon",
     "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "f000b2df-340f-4f86-8abf-9255d83e0cbc"
+      }
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mezekon",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mikhail-app-dev.mezekon"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,14 +23,18 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
+      "package": "mezek.on",
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-"plugins": [
+    "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
@@ -36,6 +45,24 @@
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
+          }
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "kotlinVersion": "2.1.20",
+            "ndkVersion": "26.1.10909125",
+            "minSdkVersion": 24,
+            "gradleVersion": "8.6",
+            "enableHermes": false
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
           }
         }
       ],
@@ -52,7 +79,20 @@
             }
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icons/main-feed.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/mezekon_not.wav"
+          ]
+        }
+      ],
+      "expo-font",
+      "expo-video",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

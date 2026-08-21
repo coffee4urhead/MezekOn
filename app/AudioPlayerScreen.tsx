@@ -1,9 +1,9 @@
+import { useAudio } from '@/context/AudioContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { Audio } from 'expo-av';
-import React, { useEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -22,60 +22,59 @@ const { width } = Dimensions.get('window');
 
 export default function AudioPlayerScreen() {
   const navigation = useNavigation();
-  const route = useRoute();
   const { isDark } = useTheme();
-  
-  const params = route.params as {
+  const audio = useAudio();
+
+  const params = useLocalSearchParams<{
     fileUrl: string;
     fileName: string;
     fileId: string;
     coverPhotoUrl?: string;
-  };
-  
-  const { fileUrl, fileName, fileId, coverPhotoUrl } = params;
-  
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+    initialPosition?: string;
+  }>();
+
+  const { fileUrl, fileName, fileId, coverPhotoUrl, initialPosition } = params;
+
   const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
   const [volume, setVolume] = useState(1);
-  
-  const positionInterval = useRef<number | null>(null);
-  
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const spinValue = useRef(new Animated.Value(0)).current;
   const spinAnimation = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    loadAudio();
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
+    if (fileUrl && fileName && fileId) {
+      audio.playAudio(fileUrl, fileName, fileId, coverPhotoUrl);
+    }
+
+    if (initialPosition && audio.isLoaded) {
+      const position = parseFloat(initialPosition);
+      if (position > 0) {
+        audio.seekTo(position);
       }
-      if (positionInterval.current) {
-        clearInterval(positionInterval.current);
-        positionInterval.current = null;
-      }
-      if (spinAnimation.current) {
-        spinAnimation.current.stop();
-      }
-    };
+    }
+
+    setIsInitialized(true);
   }, []);
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isInitialized && audio.isLoaded) {
+    }
+  }, [audio.position, isInitialized]);
+
+  useEffect(() => {
+    if (audio.isPlaying) {
       startSpinAnimation();
     } else {
       stopSpinAnimation();
     }
-  }, [isPlaying]);
+  }, [audio.isPlaying]);
 
   const startSpinAnimation = () => {
     if (spinAnimation.current) {
       spinAnimation.current.stop();
     }
-    
 
     spinAnimation.current = Animated.loop(
       Animated.timing(spinValue, {
@@ -85,7 +84,7 @@ export default function AudioPlayerScreen() {
         useNativeDriver: true,
       })
     );
-    
+
     spinAnimation.current.start();
   };
 
@@ -95,107 +94,40 @@ export default function AudioPlayerScreen() {
     }
   };
 
-  const resetSpin = () => {
-    spinValue.setValue(0);
-    if (isPlaying) {
-      startSpinAnimation();
-    }
+  const handleStopAndClose = () => {
+    audio.stopAudio();
+    navigation.goBack();
   };
 
-  const loadAudio = async () => {
-    try {
-      setIsLoading(true);
-      
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: fileUrl },
-        { shouldPlay: false, volume: volume }
-      );
-      setSound(newSound);
-      
-      const status = await newSound.getStatusAsync();
-      if (status.isLoaded) {
-        setDuration(status.durationMillis || 0);
-      }
-      
-      if (positionInterval.current) {
-        clearInterval(positionInterval.current);
-      }
-      positionInterval.current = setInterval(updatePosition, 1000) as unknown as number;
-      
-    } catch (error) {
-      console.error('Error loading audio:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updatePosition = async () => {
-    if (sound && !isSeeking) {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        setPosition(status.positionMillis || 0);
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-          setPosition(0);
-          await sound.setPositionAsync(0);
-          spinValue.setValue(0);
-        }
-      }
-    }
-  };
-
-  const togglePlayback = async () => {
-    if (!sound) return;
-    
-    try {
-      if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
-      }
-    } catch (error) {
-      console.error('Error toggling playback:', error);
+  const togglePlayback = () => {
+    if (audio.isPlaying) {
+      audio.pauseAudio();
+    } else {
+      audio.resumeAudio();
     }
   };
 
   const handleSliderChange = (value: number) => {
     setIsSeeking(true);
-    setPosition(value);
+    setSeekPosition(value);
   };
 
-  const handleSliderComplete = async (value: number) => {
-    if (sound) {
-      await sound.setPositionAsync(value);
-      setIsSeeking(false);
-      if (isPlaying) {
-        await sound.playAsync();
-      }
-    }
+  const handleSliderComplete = (value: number) => {
+    audio.seekTo(value);
+    setIsSeeking(false);
+    setSeekPosition(value);
   };
 
-  const formatTime = (millis: number) => {
-    if (!millis || isNaN(millis)) return '00:00';
-    const totalSeconds = Math.floor(millis / 1000);
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return '00:00';
+    const totalSeconds = Math.floor(seconds);
     const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const remainingSeconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleVolumeChange = async (value: number) => {
+  const handleVolumeChange = (value: number) => {
     setVolume(value);
-    if (sound) {
-      await sound.setVolumeAsync(value);
-    }
   };
 
   const handleShare = async () => {
@@ -209,18 +141,16 @@ export default function AudioPlayerScreen() {
     }
   };
 
-  const skipForward = async () => {
-    if (!sound) return;
-    const newPosition = Math.min(position + 10000, duration);
-    await sound.setPositionAsync(newPosition);
-    setPosition(newPosition);
+  const skipForward = () => {
+    const newPosition = Math.min(audio.position + 10, audio.duration);
+    audio.seekTo(newPosition);
+    setSeekPosition(newPosition);
   };
 
-  const skipBackward = async () => {
-    if (!sound) return;
-    const newPosition = Math.max(position - 10000, 0);
-    await sound.setPositionAsync(newPosition);
-    setPosition(newPosition);
+  const skipBackward = () => {
+    const newPosition = Math.max(audio.position - 10, 0);
+    audio.seekTo(newPosition);
+    setSeekPosition(newPosition);
   };
 
   const spin = spinValue.interpolate({
@@ -228,14 +158,24 @@ export default function AudioPlayerScreen() {
     outputRange: ['0deg', '360deg'],
   });
 
+  const displayPosition = isSeeking ? seekPosition : (audio.position || 0);
+  const isLoading = !audio.isLoaded;
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#121212' : '#ffffff' }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
-      <View style={[styles.header, { 
-        backgroundColor: isDark ? '#1a1a1a' : '#f8f9fa',
-        borderBottomColor: isDark ? '#333' : '#e0e0e0'
-      }]}>
+
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: isDark ? '#1a1a1a' : '#f8f9fa',
+            borderBottomColor: isDark ? '#333' : '#e0e0e0',
+          },
+        ]}
+      >
+        {/* the go back and forth buttons should go to the next audio instead of skipping time */}
+
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
@@ -244,6 +184,9 @@ export default function AudioPlayerScreen() {
         </Text>
         <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
           <Ionicons name="share-outline" size={24} color={isDark ? '#fff' : '#333'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleStopAndClose} style={styles.shareButton}>
+          <Ionicons name="close-circle" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
       </View>
 
@@ -257,29 +200,25 @@ export default function AudioPlayerScreen() {
           </View>
         ) : (
           <>
-            {/* Spinning Cover Art */}
             <View style={styles.coverContainer}>
               <Animated.View style={[styles.coverWrapper, { transform: [{ rotate: spin }] }]}>
                 {coverPhotoUrl ? (
-                  <Image 
-                    source={{ uri: coverPhotoUrl }} 
-                    style={styles.coverArt}
-                    resizeMode="cover"
-                  />
+                  <Image source={{ uri: coverPhotoUrl }} style={styles.coverArt} resizeMode="cover" />
                 ) : (
-                  <View style={[styles.coverPlaceholder, { 
-                    backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' 
-                  }]}>
+                  <View
+                    style={[
+                      styles.coverPlaceholder,
+                      { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' },
+                    ]}
+                  >
                     <Ionicons name="musical-notes" size={80} color={isDark ? '#666' : '#ccc'} />
                   </View>
                 )}
               </Animated.View>
-              {/* Center circle overlay for vinyl effect */}
               <View style={styles.vinylCenter}>
                 <View style={styles.vinylCenterInner} />
               </View>
-              {/* Play/Pause indicator ring */}
-              {isPlaying && (
+              {audio.isPlaying && (
                 <View style={styles.playingRing}>
                   <View style={styles.playingRingInner} />
                 </View>
@@ -297,22 +236,22 @@ export default function AudioPlayerScreen() {
 
             <View style={styles.progressContainer}>
               <Text style={[styles.timeText, { color: isDark ? '#999' : '#666' }]}>
-                {formatTime(position)}
+                {formatTime(displayPosition)}
               </Text>
               <Slider
                 style={styles.progressSlider}
                 minimumValue={0}
-                maximumValue={duration || 1}
-                value={position}
+                maximumValue={audio.duration || 1}
+                value={displayPosition}
                 onValueChange={handleSliderChange}
                 onSlidingComplete={handleSliderComplete}
                 minimumTrackTintColor="#1DB954"
                 maximumTrackTintColor={isDark ? '#333' : '#e0e0e0'}
                 thumbTintColor="#1DB954"
-                disabled={!sound}
+                disabled={!audio.isLoaded}
               />
               <Text style={[styles.timeText, { color: isDark ? '#999' : '#666' }]}>
-                {formatTime(duration)}
+                {formatTime(audio.duration)}
               </Text>
             </View>
 
@@ -320,18 +259,14 @@ export default function AudioPlayerScreen() {
               <TouchableOpacity style={styles.controlButton} onPress={skipBackward}>
                 <Ionicons name="play-skip-back" size={32} color={isDark ? '#fff' : '#333'} />
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={[styles.playButton, { backgroundColor: '#1DB954' }]}
                 onPress={togglePlayback}
               >
-                <Ionicons 
-                  name={isPlaying ? 'pause' : 'play'} 
-                  size={36} 
-                  color="#fff" 
-                />
+                <Ionicons name={audio.isPlaying ? 'pause' : 'play'} size={36} color="#fff" />
               </TouchableOpacity>
-              
+
               <TouchableOpacity style={styles.controlButton} onPress={skipForward}>
                 <Ionicons name="play-skip-forward" size={32} color={isDark ? '#fff' : '#333'} />
               </TouchableOpacity>
