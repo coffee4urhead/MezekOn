@@ -24,7 +24,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.mikhail_app_dev.mezekon",
+      "googleServicesFile": "./google-services.json",
+      "package": "mezek.on",
       "permissions": [
         "RECORD_AUDIO"
       ]

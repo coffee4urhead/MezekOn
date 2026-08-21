@@ -174,6 +174,8 @@ export default function AudioPlayerScreen() {
           },
         ]}
       >
+        {/* the go back and forth buttons should go to the next audio instead of skipping time */}
+
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>

@@ -1,6 +1,5 @@
 import { account, client } from '@/hooks/appwrite';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Alert, Platform } from 'react-native';
@@ -52,7 +51,6 @@ export async function fetchProfilePhoto(fileId: string, bucket_to_look_into: str
 export async function registerForPushNotificationsAsync() {
   let token;
   if (Device.isDevice) {
-
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     
@@ -66,11 +64,9 @@ export async function registerForPushNotificationsAsync() {
       return;
     }
 
-    token = (await Notifications.getExpoPushTokenAsync({
-      projectId: Constants.expoConfig?.extra?.eas?.projectId,
-    })).data;
+    token = (await Notifications.getDevicePushTokenAsync()).data;
     
-    console.log('Expo push token:', token);
+    console.log('FCM device token:', token);
   } else {
     alert('Must use physical device for Push Notifications');
     return;

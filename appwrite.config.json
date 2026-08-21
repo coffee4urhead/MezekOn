@@ -1,0 +1,31 @@
+{
+    "projectId": "6a03867b002708f2d016",
+    "functions": [
+        {
+            "$id": "6a8088ec0005b39d48db",
+            "name": "Messaging Function",
+            "runtime": "node-16.0",
+            "buildSpecification": "s-1vcpu-512mb",
+            "runtimeSpecification": "s-1vcpu-512mb",
+            "execute": [
+                "any"
+            ],
+            "events": [],
+            "scopes": [
+                "users.read"
+            ],
+            "schedule": "",
+            "timeout": 15,
+            "enabled": true,
+            "logging": true,
+            "entrypoint": "src/main.js",
+            "commands": "npm install",
+            "ignore": [
+                "node_modules",
+                ".npm"
+            ],
+            "deploymentRetention": 0,
+            "path": "functions/messaging-function"
+        }
+    ]
+}
