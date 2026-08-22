@@ -1,9 +1,39 @@
 import { useTheme } from '@/context/ThemeContext';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useArtickles } from '@/hooks/use-user-artickles';
+import { useEffect, useState } from 'react';
+import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import ArtickleItem, { ArtickleItemInfo } from '../ArtickleItem';
+import CreateButton, { CreationScreen } from '../ui/CreateButton';
 
 export default function CurrentlyHot() {
   const { isDark } = useTheme();
-  
+  const { fetchAllArtickles, loading, artickles } = useArtickles();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    fetchAllArtickles();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllArtickles();
+    setRefreshing(false);
+  }
+
+  const renderArtickleItem = ({ item }: { item: ArtickleItemInfo }) => (
+  <ArtickleItem
+    author_id={item.author_id}
+    content={item.content}
+    media_urls={item.media_urls}
+    likes_count={item.likes_count}
+    comments_count={item.comments_count}
+    views_count={item.views_count}
+    title={item.title}
+    $createdAt={item.$createdAt}
+    $updatedAt={item.$updatedAt}
+  />
+);
+
   return (
     <View style={[
       styles.container, 
@@ -13,6 +43,9 @@ export default function CurrentlyHot() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
@@ -21,6 +54,21 @@ export default function CurrentlyHot() {
           <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
             Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
           </Text>
+        </View>
+        
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+            Последни публикации
+          </Text>
+
+          {artickles && (
+              <FlatList
+                data={artickles}
+                renderItem={renderArtickleItem}
+                keyExtractor={(item) => item.$id}
+                scrollEnabled={false}
+              />
+          )}
         </View>
 
         <View style={styles.section}>
@@ -105,6 +153,8 @@ export default function CurrentlyHot() {
 
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      <CreateButton creationScreen={CreationScreen.Artickles}/>
     </View>
   );
 }

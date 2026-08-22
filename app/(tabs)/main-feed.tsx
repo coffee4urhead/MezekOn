@@ -37,7 +37,7 @@ export default function EventsScreen() {
           tabBarInactiveTintColor: isDark ? '#888888' : '#999999',
         }}
       >
-        <TopTab.Screen name="Най-ново" component={CurrentlyHot} />
+        <TopTab.Screen name="Статии" component={CurrentlyHot} />
         <TopTab.Screen name="История" component={History} />
         <TopTab.Screen name="Новини" component={News} />
         <TopTab.Screen name="Събития" component={Events} />
@@ -51,5 +51,4 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 0,
   },
-  // ... rest of your styles
 });

@@ -1,14 +1,15 @@
 import { useTheme } from '@/context/ThemeContext';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Popover, { PopoverPlacement } from 'react-native-popover-view';
 import UploadAudio from '../modals/AudioUploadComponent';
 import CreateAnnouncement from '../modals/CreateAnnouncement';
+import CreateArtickle from '../modals/CreateArtickle';
 import CreateEvent from '../modals/CreateEvent';
 import UploadHistoryArchive from '../modals/HistoryUploadArchive';
 
 export enum CreationScreen {
-    'History', 'News', 'Events'
+    'History', 'News', 'Events', 'Artickles'
 }
 
 interface CreateButtonProps {
@@ -40,6 +41,9 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
       case 'Add Announcement':
         setOptionModalVisibilty(true);
         break;
+      case 'Add Artickle':
+        setOptionModalVisibilty(true);
+        break;
       default:
         console.log("Something went wrong! Wrong option pressed!");
         break;
@@ -64,6 +68,10 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
         return [
           { id: 'add_event', label: '📅 Добави събитие', action: 'Add Event' },
           { id: 'add_announcement', label: '📢 Добави обявление', action: 'Add Announcement' },
+        ];
+      case CreationScreen.Artickles:
+        return [
+          { id: 'add_artickle', label: '📅 Добави статия', action: 'Add Artickle' },
         ];
       
       default:
@@ -103,6 +111,13 @@ export default function CreateButton({ creationScreen }: CreateButtonProps) {
         isVisible={optionModalUploadVisible}
         setModalVisibility={setOptionModalVisibilty}
         />);
+      case 'Add Artickle':
+        return (
+          <CreateArtickle
+          isVisible={optionModalUploadVisible}
+          setModalVisibility={setOptionModalVisibilty}
+          />
+        );
       default:
         return null;
     }
