@@ -22,6 +22,7 @@ export default function CurrentlyHot() {
 
   const renderArtickleItem = ({ item }: { item: ArtickleItemInfo }) => (
   <ArtickleItem
+    $id={item.$id}
     author_id={item.author_id}
     content={item.content}
     media_urls={item.media_urls}

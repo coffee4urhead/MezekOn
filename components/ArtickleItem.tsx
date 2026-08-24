@@ -1,10 +1,14 @@
 import { useTheme } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
+import { useArtickles } from '@/hooks/use-user-artickles';
 import { useUserFiles } from '@/hooks/use-user-files';
+import useLikes from '@/hooks/use-user-likes';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export interface ArtickleItemInfo {
+    $id: string,
     author_id: string;
     content: string;
     media_urls: string[];
@@ -16,15 +20,17 @@ export interface ArtickleItemInfo {
     $updatedAt: string;
 }
 
-type IconType = 'likes_icon' | 'views_icon' | 'comments_icon';
+type IconType = 'likes_filled_icon' | 'likes_icon' | 'views_icon' | 'comments_icon';
 
 const iconMap = {
+    'likes_filled_icon': require('@/assets/icons/artickleIcons/heart-filled.png'),
     'likes_icon': require('@/assets/icons/artickleIcons/heart.png'),
     'comments_icon': require('@/assets/icons/artickleIcons/comment.png'),
     'views_icon': require('@/assets/icons/artickleIcons/views.png'),
 }
 
-export default function ArtickleItem({ 
+export default function ArtickleItem({
+    $id,
     author_id,
     content,
     media_urls,
@@ -36,11 +42,16 @@ export default function ArtickleItem({
     $updatedAt
 }: ArtickleItemInfo) {
 
-    const { getUserById } = useUser();
+    const { getUserById, user } = useUser();
     const { profilePhoto } = useUserFiles(author_id || '');
     const [authorName, setAuthorName] = useState<string>('Author');
-    const [authorAvatar, setAuthorAvatar] = useState<string | null>(null);
     const { isDark } = useTheme();
+    const { incrementLikes, decrementLikes } = useArtickles();
+    const { checkIfUserLiked, toggleLike } = useLikes();
+    const [isLiked, setIsLiked] = useState(false);
+    const [localLikesCount, setLocalLikesCount] = useState(likes_count || 0);
+    const [isLoading, setIsLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchAuthor = async () => {
@@ -48,12 +59,24 @@ export default function ArtickleItem({
                 const author = await getUserById(author_id);
                 if (author) {
                     setAuthorName(author.name || 'Unknown User');
-                    setAuthorAvatar(author.profilePhoto || null);
                 }
             }
         };
         fetchAuthor();
     }, [author_id]);
+
+    useEffect(() => {
+        const checkLikeStatus = async () => {
+            if (user?.$id && $id) {
+                const liked = await checkIfUserLiked(user.$id, $id);
+                setIsLiked(liked);
+                setIsLoading(false);
+            } else {
+                setIsLoading(false);
+            }
+        };
+        checkLikeStatus();
+    }, [user?.$id, $id]);
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('bg-BG', {
@@ -63,12 +86,82 @@ export default function ArtickleItem({
         });
     };
 
+    const handleLikeToggle = async () => {
+        if (!user?.$id) {
+            console.log('User not logged in');
+            return;
+        }
+
+        const currentIsLiked = isLiked;
+        const currentCount = localLikesCount;
+
+        setLocalLikesCount(prev => currentIsLiked ? prev - 1 : prev + 1);
+        setIsLiked(!currentIsLiked);
+
+        try {
+            const newLikeState = await toggleLike(user.$id, $id);
+            
+            if (newLikeState) {
+                await incrementLikes($id);
+            } else {
+                await decrementLikes($id);
+            }
+        } catch (error) {
+            setLocalLikesCount(currentCount);
+            setIsLiked(currentIsLiked);
+            console.error('Failed to toggle like:', error);
+        }
+    };
+
+    const navigateToArtickleModalComponent = (artickleId: string) => {
+    router.push({
+        pathname: '/ArtickleViewer',
+        params: { id: artickleId }
+    });
+}
+
+    const handleStatButtonPress = async (iconType: IconType) => {
+        switch(iconType) {
+            case 'likes_icon':
+            case 'likes_filled_icon':
+                handleLikeToggle();
+                break;
+            case 'comments_icon':
+                navigateToArtickleModalComponent($id);
+                break;
+            default:
+                break;
+        }
+    };
+
     const renderStatIcon = (iconType: IconType, stat: number) => {
+        let iconKey: IconType = iconType;
+        if (iconType === 'likes_icon' || iconType === 'likes_filled_icon') {
+            iconKey = isLiked ? 'likes_filled_icon' : 'likes_icon';
+        }
+
         return (
-            <TouchableOpacity style={styles.statIconHolder}>
-                <Image source={iconMap[iconType]} style={styles.statIcon} />
-                <Text style={styles.statStyle}>{stat}</Text>
+            <TouchableOpacity 
+                style={styles.statIconHolder} 
+                onPress={() => handleStatButtonPress(iconType)}
+                activeOpacity={0.7}
+            >
+                <Image source={iconMap[iconKey]} style={styles.statIcon} />
+                <Text style={[
+                    styles.statStyle,
+                    isLiked && (iconType === 'likes_icon' || iconType === 'likes_filled_icon') && styles.likedText
+                ]}>
+                    {stat}
+                </Text>
             </TouchableOpacity>
+        );
+    };
+
+    if (isLoading) {
+        return (
+            <View style={[styles.artickleContainer, { opacity: 0.7 }]}>
+                <Text>Loading...</Text>
+            </View>
         );
     }
 
@@ -113,13 +206,13 @@ export default function ArtickleItem({
             )}
 
             <View style={styles.statsSection}>
-                {renderStatIcon('likes_icon', likes_count)}
+                {renderStatIcon('likes_icon', localLikesCount)}
                 {renderStatIcon('comments_icon', comments_count)}
                 {renderStatIcon('views_icon', views_count)}
             </View>
         </View>
     );
-}  
+}
 
 const styles = StyleSheet.create({
     artickleContainer: {
@@ -139,6 +232,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 12,
+    },
+    likedText: {
+        color: '#e74c3c',
     },
     avatarContainer: {
         marginRight: 12,

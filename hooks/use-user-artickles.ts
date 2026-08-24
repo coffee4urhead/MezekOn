@@ -59,6 +59,7 @@ interface UseArticklesReturn {
   fetchTrendingArtickles: (limit?: number) => Promise<ArtickleData[]>;
   
   incrementLikes: (artickleId: string) => Promise<void>;
+  decrementLikes: (artickleId: string) => Promise<void>;
   incrementComments: (artickleId: string) => Promise<void>;
   incrementViews: (artickleId: string) => Promise<void>;
   
@@ -458,15 +459,23 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
 
   const incrementLikes = useCallback(async (artickleId: string): Promise<void> => {
     try {
-      const currentArtickle = artickles.find(a => a.$id === artickleId);
-      if (!currentArtickle) return;
-
+      const artickleToUpdate = artickles.find(a => a.$id === artickleId);
+      if (!artickleToUpdate) {
+        console.error('Artickle not found in local state:', artickleId);
+        return;
+      }
+      
+      console.log('Artickle to update: ', artickleToUpdate);
+      console.log('All artickles: ', artickles);
+      console.log('selected artickle id: ', artickleId);
+      const currentLikes = artickleToUpdate.likes_count || 0;
+      
       await databases.updateDocument(
         DATABASE_ID,
         COLLECTION_ID,
         artickleId,
         {
-          likes_count: (currentArtickle.likes_count || 0) + 1
+          likes_count: currentLikes + 1
         }
       );
 
@@ -479,9 +488,47 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
       if (artickle?.$id === artickleId) {
         setArtickle(prev => prev ? { ...prev, likes_count: (prev.likes_count || 0) + 1 } : null);
       }
+      console.log('after the update: ', artickleToUpdate);
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error incrementing likes:', appwriteError.message);
+      setError(appwriteError);
+      throw err;
+    }
+  }, [artickles, artickle]);
+
+  const decrementLikes = useCallback(async (artickleId: string): Promise<void> => {
+    try {
+      const artickleToUpdate = artickles.find(a => a.$id === artickleId);
+      if (!artickleToUpdate) {
+        console.error('Artickle not found in local state:', artickleId);
+        return;
+      }
+
+      const currentLikes = artickleToUpdate.likes_count || 0;
+      const newLikes = Math.max(0, currentLikes - 1);
+      
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTION_ID,
+        artickleId,
+        {
+          likes_count: newLikes
+        }
+      );
+
+      setArtickles(prev => prev.map(a => 
+        a.$id === artickleId 
+          ? { ...a, likes_count: Math.max(0, (a.likes_count || 0) - 1) }
+          : a
+      ));
+
+      if (artickle?.$id === artickleId) {
+        setArtickle(prev => prev ? { ...prev, likes_count: Math.max(0, (prev.likes_count || 0) - 1) } : null);
+      }
+    } catch (err) {
+      const appwriteError = err as AppwriteException;
+      console.error('Error decrementing likes:', appwriteError.message);
       setError(appwriteError);
       throw err;
     }
@@ -518,36 +565,42 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     }
   }, [artickles, artickle]);
 
+  // needs fixing 
   const incrementViews = useCallback(async (artickleId: string): Promise<void> => {
-    try {
-      const currentArtickle = artickles.find(a => a.$id === artickleId);
-      if (!currentArtickle) return;
+  try {
+    const currentArtickle = await databases.getDocument(
+      DATABASE_ID,
+      COLLECTION_ID,
+      artickleId
+    );
 
-      await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTION_ID,
-        artickleId,
-        {
-          views_count: (currentArtickle.views_count || 0) + 1
-        }
-      );
-
-      setArtickles(prev => prev.map(a => 
-        a.$id === artickleId 
-          ? { ...a, views_count: (a.views_count || 0) + 1 }
-          : a
-      ));
-
-      if (artickle?.$id === artickleId) {
-        setArtickle(prev => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : null);
+    const currentViews = currentArtickle.views_count || 0;
+    
+    await databases.updateDocument(
+      DATABASE_ID,
+      COLLECTION_ID,
+      artickleId,
+      {
+        views_count: currentViews + 1
       }
-    } catch (err) {
-      const appwriteError = err as AppwriteException;
-      console.error('Error incrementing views:', appwriteError.message);
-      setError(appwriteError);
-      throw err;
+    );
+
+    setArtickles(prev => prev.map(a => 
+      a.$id === artickleId 
+        ? { ...a, views_count: (a.views_count || 0) + 1 }
+        : a
+    ));
+
+    if (artickle?.$id === artickleId) {
+      setArtickle(prev => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : null);
     }
-  }, [artickles, artickle]);
+  } catch (err) {
+    const appwriteError = err as AppwriteException;
+    console.error('Error incrementing views:', appwriteError.message);
+    setError(appwriteError);
+    throw err;
+  }
+}, [artickle]);
 
   const approveArtickle = useCallback(async (artickleId: string): Promise<ArtickleData> => {
     return updateArtickle({
@@ -611,6 +664,7 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     fetchTrendingArtickles,
     
     incrementLikes,
+    decrementLikes,
     incrementComments,
     incrementViews,
     
