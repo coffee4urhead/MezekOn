@@ -1,6 +1,9 @@
+import { useArtickleStore } from '@/components/stores/artickleStore';
+import { useUserLikesStore } from '@/components/stores/useUserLikesStore';
 import { useCallback, useState } from 'react';
 import { AppwriteException, ID, Query } from 'react-native-appwrite';
 import { databases } from './appwrite';
+import { useArtickles } from './use-user-artickles';
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
 const COLLECTION_ID = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_USER_LIKES || '';
@@ -54,6 +57,16 @@ export default function useLikes(): UseLikesReturn {
   const [userLiked, setUserLiked] = useState<UserLike[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<AppwriteException | null>(null);
+
+  const {incrementLikes, incrementComments, decrementLikes } = useArtickles();
+
+  const setLiked = useUserLikesStore((state) => state.setLiked);
+  const optimisticIncrementLikes = useArtickleStore(
+    (state) => state.optimisticIncrementLikes
+  );
+  const optimisticDecrementLikes = useArtickleStore(
+    (state) => state.optimisticDecrementLikes
+  );
 
   const fetchAllLikes = useCallback(async (): Promise<UserLike[]> => {
     try {
@@ -109,6 +122,11 @@ export default function useLikes(): UseLikesReturn {
       }));
 
       setUserLiked(docs);
+      
+      docs.forEach(like => {
+        setLiked(like.artickle_id, true);
+      });
+      
       return docs;
     } catch (err) {
       const appErr = err as AppwriteException;
@@ -118,7 +136,7 @@ export default function useLikes(): UseLikesReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setLiked]);
 
   const fetchUserLikedArticklesIds = useCallback(async (userId: string): Promise<string[]> => {
     try {
@@ -182,12 +200,13 @@ export default function useLikes(): UseLikesReturn {
           Query.limit(1)
         ]
       );
-      return response.documents.length > 0;
+      const isLiked = response.documents.length > 0;
+      return isLiked;
     } catch (err) {
       console.error('Error checking if user liked:', err);
       return false;
     }
-  }, []);
+  }, [setLiked]);
 
   const addLike = useCallback(async (userId: string, artickleId: string): Promise<UserLike> => {
     try {
@@ -218,6 +237,10 @@ export default function useLikes(): UseLikesReturn {
         setUserLiked(prev => [newLike, ...prev]);
       }
 
+      setLiked(artickleId, true);
+      optimisticIncrementLikes(artickleId);
+      await incrementLikes(artickleId);
+
       return newLike;
     } catch (err) {
       const appErr = err as AppwriteException;
@@ -227,7 +250,7 @@ export default function useLikes(): UseLikesReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [userLiked]);
+  }, [userLiked, setLiked, optimisticIncrementLikes]);
 
   const removeLike = useCallback(async (userId: string, artickleId: string): Promise<void> => {
     try {
@@ -258,6 +281,11 @@ export default function useLikes(): UseLikesReturn {
 
       setAllLikes(prev => prev.filter(like => like.$id !== likeId));
       setUserLiked(prev => prev.filter(like => like.$id !== likeId));
+
+      setLiked(artickleId, false);
+      optimisticDecrementLikes(artickleId);
+      await decrementLikes(artickleId);
+      
     } catch (err) {
       const appErr = err as AppwriteException;
       setError(appErr);
@@ -266,7 +294,7 @@ export default function useLikes(): UseLikesReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setLiked, optimisticDecrementLikes]);
 
   const toggleLike = useCallback(async (userId: string, artickleId: string): Promise<boolean> => {
     try {

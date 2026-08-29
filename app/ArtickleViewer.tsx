@@ -1,105 +1,113 @@
+import { useArtickleStore } from '@/components/stores/artickleStore';
+import { useUserLikesStore } from '@/components/stores/useUserLikesStore';
 import { useTheme } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useArtickles } from '@/hooks/use-user-artickles';
+import { CommentData, useComments } from '@/hooks/use-user-comments';
 import { useUserFiles } from '@/hooks/use-user-files';
 import useLikes from '@/hooks/use-user-likes';
+import useViews from '@/hooks/user-user-views';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface Comment {
-  id: string;
-  user_id: string;
-  user_name: string;
-  user_avatar?: string;
-  text: string;
-  created_at: string;
-  likes: number;
-}
 
 export default function ArtickleViewer() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isDark } = useTheme();
   const { user } = useUser();
-  const { getArtickleById, incrementViews } = useArtickles();
-  const { getUserById } = useUser();
-  const { profilePhoto } = useUserFiles(user?.$id || '');
-  const { checkIfUserLiked, toggleLike } = useLikes();
 
-  const [artickle, setArtickle] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [localLikesCount, setLocalLikesCount] = useState(0);
+  const artickle = useArtickleStore((state) =>
+    state.artickles.find((a) => a.$id === id)
+  );
+
+  const isLiked = useUserLikesStore((state) => state.likedArtickles[id] ?? false);
+  const setLiked = useUserLikesStore((state) => state.setLiked);
+
+  const optimisticIncrementComments = useArtickleStore((state) => state.optimisticIncrementComments);
+
+  const { getArtickleById, incrementViews } = useArtickles();
+  const { toggleLike } = useLikes();
+  const { profilePhoto } = useUserFiles(user?.$id || '');
+  const { addView, checkIfUserViewed } = useViews();
+  const { comments, createComment, fetchCommentsByArticle } = useComments();
+
+  const [localArtickle, setLocalArtickle] = useState<any>(null);
+  const [localLoading, setLocalLoading] = useState(true);
+  const [localViewsCount, setLocalViewsCount] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: '1',
-      user_id: 'user1',
-      user_name: 'Иван Петров',
-      text: 'Много интересна статия! Благодаря за споделянето! 🙏',
-      created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      likes: 12,
-    },
-    {
-      id: '2',
-      user_id: 'user2',
-      user_name: 'Мария Георгиева',
-      text: 'Това е изключително важно за запазване на нашето културно наследство. Поздравления за автора! 👏',
-      created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-      likes: 8,
-    },
-    {
-      id: '3',
-      user_id: 'user3',
-      user_name: 'Димитър Стоянов',
-      text: 'Имам няколко допълнителни въпроса по темата. Може ли да се свържа с автора?',
-      created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-      likes: 3,
-    },
-  ]);
+  const viewTrackedRef = useRef(false);
 
   useEffect(() => {
-    const fetchArtickle = async () => {
-      if (id) {
-        try {
-          const data = await getArtickleById(id);
-          setArtickle(data);
-          setLocalLikesCount(data?.likes_count || 0);
-          
-          if (data) {
-            await incrementViews(id);
-          }
-          
-          if (user?.$id) {
-            const liked = await checkIfUserLiked(user.$id, id);
-            setIsLiked(liked);
-          }
-        } catch (error) {
-          console.error('Error fetching artickle:', error);
-        } finally {
-          setLoading(false);
+    const fetchArtickleAndComments = async () => {
+      if (!id) return;
+
+      try {
+        setLocalLoading(true);
+
+        const data = await getArtickleById(id);
+        if (data) {
+          setLocalArtickle(data);
+          setLocalViewsCount(data.views_count || 0);
         }
+
+        await fetchCommentsByArticle(id);
+
+        if (data && user?.$id && !viewTrackedRef.current) {
+          try {
+            const hasViewed = await checkIfUserViewed(user.$id, id);
+
+            if (!hasViewed) {
+              await addView(user.$id, id);
+              await incrementViews(id);
+              setLocalViewsCount((prev) => prev + 1);
+              viewTrackedRef.current = true;
+            } else {
+              if (data.views_count !== undefined) {
+                setLocalViewsCount(data.views_count);
+              }
+            }
+          } catch (viewError) {
+            console.error('Error tracking view:', viewError);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        Alert.alert('Грешка', 'Възникна проблем при зареждането на статията');
+      } finally {
+        setLocalLoading(false);
       }
     };
-    fetchArtickle();
-  }, [id]);
+
+    fetchArtickleAndComments();
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleGoBack();
+      return true;
+    });
+
+    return () => {
+      viewTrackedRef.current = false;
+      backHandler.remove();
+    };
+  }, [id, user?.$id]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -117,78 +125,78 @@ export default function ArtickleViewer() {
   };
 
   const handleLikeToggle = async () => {
-    if (!user?.$id) return;
+    if (!user?.$id) {
+      Alert.alert('Вход', 'Моля, влезте в профила си, за да харесате статия');
+      return;
+    }
 
-    const currentIsLiked = isLiked;
-    setIsLiked(!currentIsLiked);
-    setLocalLikesCount(prev => currentIsLiked ? prev - 1 : prev + 1);
+    const newLikedState = !isLiked;
+    setLiked(id, newLikedState);
 
     try {
-      const newLikeState = await toggleLike(user.$id, id);
-      if (newLikeState) {
-        // Like was added
-      } else {
-        // Like was removed
-      }
+      await toggleLike(user.$id, id);
     } catch (error) {
-      setIsLiked(currentIsLiked);
-      setLocalLikesCount(prev => currentIsLiked ? prev + 1 : prev - 1);
+      setLiked(id, !newLikedState);
       console.error('Failed to toggle like:', error);
+      Alert.alert('Грешка', 'Неуспешно действие. Моля, опитайте отново.');
     }
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim() || !user?.$id) return;
+    if (!commentText.trim()) {
+      Alert.alert('Грешка', 'Моля, напишете коментар');
+      return;
+    }
+
+    if (!user?.$id) {
+      Alert.alert('Вход', 'Моля, влезте в профила си, за да коментирате');
+      return;
+    }
 
     setIsSubmitting(true);
+    optimisticIncrementComments(id);
     try {
-      const newComment: Comment = {
-        id: Date.now().toString(),
-        user_id: user.$id,
-        user_name: user.name || 'Anonymous',
-        user_avatar: profilePhoto?.coverPhotoUrl,
-        text: commentText.trim(),
-        created_at: new Date().toISOString(),
-        likes: 0,
-      };
-      setComments(prev => [newComment, ...prev]);
+      await createComment({
+        author_id: user.$id,
+        artickle_id: id,
+        comment_content: commentText.trim(),
+      });
+
       setCommentText('');
     } catch (error) {
       console.error('Error adding comment:', error);
+      Alert.alert('Грешка', 'Неуспешно добавяне на коментар');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const renderComment = ({ item }: { item: Comment }) => {
-    const isOwnComment = item.user_id === user?.$id;
+  const renderComment = ({ item }: { item: CommentData }) => {
+    const isOwnComment = item.author_id === user?.$id;
+    const userName = item.author_id || 'Unknown User';
 
     return (
       <View style={styles.commentItem}>
         <View style={styles.commentAvatarContainer}>
-          {item.user_avatar ? (
-            <Image source={{ uri: item.user_avatar }} style={styles.commentAvatar} />
-          ) : (
-            <View style={[styles.commentAvatar, styles.commentAvatarPlaceholder]}>
-              <Text style={styles.commentAvatarText}>
-                {item.user_name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <View style={[styles.commentAvatar, styles.commentAvatarPlaceholder]}>
+            <Text style={styles.commentAvatarText}>
+              {userName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
         </View>
         <View style={styles.commentContent}>
           <View style={styles.commentHeader}>
             <Text style={[styles.commentUserName, isOwnComment && styles.ownComment]}>
-              {item.user_name}
+              {userName}
               {isOwnComment && ' (Вие)'}
             </Text>
-            <Text style={styles.commentTime}>{formatDate(item.created_at)}</Text>
+            <Text style={styles.commentTime}>{formatDate(item.$createdAt)}</Text>
           </View>
-          <Text style={styles.commentText}>{item.text}</Text>
+          <Text style={styles.commentText}>{item.comment_content}</Text>
           <View style={styles.commentActions}>
             <TouchableOpacity style={styles.commentActionButton}>
               <Ionicons name="heart-outline" size={14} color="#666" />
-              <Text style={styles.commentActionText}>{item.likes}</Text>
+              <Text style={styles.commentActionText}>0</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.commentActionButton}>
               <Ionicons name="chatbubble-outline" size={14} color="#666" />
@@ -200,17 +208,33 @@ export default function ArtickleViewer() {
     );
   };
 
-  if (loading) {
+  const handleGoBack = () => {
+    router.back();
+  };
+
+  if (localLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      <SafeAreaView
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' },
+        ]}
+      >
         <ActivityIndicator size="large" color="#0347F2" />
       </SafeAreaView>
     );
   }
 
-  if (!artickle) {
+  if (!localArtickle && !artickle) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      <SafeAreaView
+        style={[
+          styles.container,
+          styles.centered,
+          { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' },
+        ]}
+      >
         <Text style={{ color: isDark ? '#ffffff' : '#333333' }}>Статията не беше намерена</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButtonHeader}>
           <Text style={styles.closeButtonText}>Затвори</Text>
@@ -219,127 +243,147 @@ export default function ArtickleViewer() {
     );
   }
 
+  const displayArtickle = artickle || localArtickle;
+  const displayLikesCount = artickle?.likes_count ?? localArtickle?.likes_count ?? 0;
+
+  const ListHeaderComponent = () => (
+    <View style={styles.postContainer}>
+      <View style={styles.authorSection}>
+        <View style={styles.avatarContainer}>
+          <Image
+            source={{
+              uri: 'https://ui-avatars.com/api/?name=Author&background=0347F2&color=fff&size=40',
+            }}
+            style={styles.avatar}
+          />
+        </View>
+        <View style={styles.authorInfo}>
+          <Text style={[styles.authorName, { color: isDark ? '#fff' : '#1a1a1a' }]}>
+            {displayArtickle.author_id || 'Автор'}
+          </Text>
+          <Text style={[styles.dateString, { color: isDark ? '#888' : '#888' }]}>
+            {formatDate(displayArtickle.$createdAt)} · 🌍 Публично
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.contentSection}>
+        <Text style={[styles.artickleTitle, { color: isDark ? '#fff' : '#1a1a1a' }]}>
+          {displayArtickle.title}
+        </Text>
+        <Text style={[styles.contentText, { color: isDark ? '#ccc' : '#444' }]}>
+          {displayArtickle.content}
+        </Text>
+      </View>
+
+      {displayArtickle.media_urls && displayArtickle.media_urls.length > 0 && (
+        <View style={styles.mediaSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {displayArtickle.media_urls.map((url: string, index: number) => (
+              <Image key={index} source={{ uri: url }} style={styles.mediaImage} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={[styles.statsSection, { borderBottomColor: isDark ? '#333' : '#e8edff' }]}>
+        <View style={styles.statsRow}>
+          <Text style={[styles.statText, { color: isDark ? '#aaa' : '#666' }]}>
+            {comments.length} коментара
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.actionButtons, { borderBottomColor: isDark ? '#333' : '#e8edff' }]}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleLikeToggle}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={24}
+            color={isLiked ? '#e74c3c' : isDark ? '#aaa' : '#666'}
+          />
+          <Text
+            style={[
+              styles.actionButtonText,
+              {
+                color: isLiked ? '#e74c3c' : isDark ? '#aaa' : '#666',
+              },
+            ]}
+          >
+            {isLiked ? 'Харесвам' : 'Харесай'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+          <Ionicons name="chatbubble-outline" size={24} color={isDark ? '#aaa' : '#666'} />
+          <Text style={[styles.actionButtonText, { color: isDark ? '#aaa' : '#666' }]}>
+            Коментирай
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+          <Ionicons name="share-outline" size={24} color={isDark ? '#aaa' : '#666'} />
+          <Text style={[styles.actionButtonText, { color: isDark ? '#aaa' : '#666' }]}>
+            Сподели
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
-      {/* Header */}
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}
+    >
       <View style={[styles.header, { borderBottomColor: isDark ? '#333' : '#e8edff' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.closeButton}>
           <Ionicons name="close" size={28} color={isDark ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: isDark ? '#fff' : '#333' }]}>Статия</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <KeyboardAvoidingView 
-        style={styles.keyboardAvoidingView} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
         <FlatList
           data={comments}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.$id}
           renderItem={renderComment}
-          ListHeaderComponent={
-            <View style={styles.postContainer}>
-              <View style={styles.authorSection}>
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: 'https://ui-avatars.com/api/?name=Author&background=0347F2&color=fff&size=40' }}
-                    style={styles.avatar}
-                  />
-                </View>
-                <View style={styles.authorInfo}>
-                  <Text style={[styles.authorName, { color: isDark ? '#fff' : '#1a1a1a' }]}>
-                    {artickle.author_id || 'Автор'}
-                  </Text>
-                  <Text style={[styles.dateString, { color: isDark ? '#888' : '#888' }]}>
-                    {formatDate(artickle.$createdAt)} · 🌍 Публично
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.contentSection}>
-                <Text style={[styles.artickleTitle, { color: isDark ? '#fff' : '#1a1a1a' }]}>
-                  {artickle.title}
-                </Text>
-                <Text style={[styles.contentText, { color: isDark ? '#ccc' : '#444' }]}>
-                  {artickle.content}
-                </Text>
-              </View>
-
-              {artickle.media_urls && artickle.media_urls.length > 0 && (
-                <View style={styles.mediaSection}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {artickle.media_urls.map((url: string, index: number) => (
-                      <Image key={index} source={{ uri: url }} style={styles.mediaImage} />
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              <View style={[styles.statsSection, { borderBottomColor: isDark ? '#333' : '#e8edff' }]}>
-                <View style={styles.statsRow}>
-                  <View style={styles.statItem}>
-                    <Ionicons name="heart" size={16} color="#e74c3c" />
-                    <Text style={[styles.statText, { color: isDark ? '#aaa' : '#666' }]}>
-                      {localLikesCount}
-                    </Text>
-                  </View>
-                  <Text style={[styles.statText, { color: isDark ? '#aaa' : '#666' }]}>
-                    {comments.length} коментара
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.actionButtons, { borderBottomColor: isDark ? '#333' : '#e8edff' }]}>
-                <TouchableOpacity 
-                  style={styles.actionButton} 
-                  onPress={handleLikeToggle}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons 
-                    name={isLiked ? 'heart' : 'heart-outline'} 
-                    size={24} 
-                    color={isLiked ? '#e74c3c' : (isDark ? '#aaa' : '#666')} 
-                  />
-                  <Text style={[styles.actionButtonText, { 
-                    color: isLiked ? '#e74c3c' : (isDark ? '#aaa' : '#666') 
-                  }]}>
-                    {isLiked ? 'Харесвам' : 'Харесай'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                  <Ionicons name="chatbubble-outline" size={24} color={isDark ? '#aaa' : '#666'} />
-                  <Text style={[styles.actionButtonText, { color: isDark ? '#aaa' : '#666' }]}>
-                    Коментирай
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                  <Ionicons name="share-outline" size={24} color={isDark ? '#aaa' : '#666'} />
-                  <Text style={[styles.actionButtonText, { color: isDark ? '#aaa' : '#666' }]}>
-                    Сподели
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          }
+          ListHeaderComponent={ListHeaderComponent}
           ListFooterComponent={<View style={styles.footerSpacer} />}
           contentContainerStyle={styles.contentContainer}
           showsVerticalScrollIndicator={false}
         />
 
-        <View style={[styles.commentInputContainer, { 
-          borderTopColor: isDark ? '#333' : '#e8edff',
-          backgroundColor: isDark ? '#1a1a1a' : '#ffffff'
-        }]}>
+        <View
+          style={[
+            styles.commentInputContainer,
+            {
+              borderTopColor: isDark ? '#333' : '#e8edff',
+              backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+            },
+          ]}
+        >
           <View style={styles.commentInputWrapper}>
             <View style={styles.commentInputAvatar}>
-              {profilePhoto ? (
-                <Image source={{ uri: profilePhoto.coverPhotoUrl }} style={styles.commentInputAvatarImage} />
+              {profilePhoto?.coverPhotoUrl ? (
+                <Image
+                  source={{ uri: profilePhoto.coverPhotoUrl }}
+                  style={styles.commentInputAvatarImage}
+                />
               ) : (
-                <View style={[styles.commentInputAvatarImage, styles.commentInputAvatarPlaceholder]}>
+                <View
+                  style={[
+                    styles.commentInputAvatarImage,
+                    styles.commentInputAvatarPlaceholder,
+                  ]}
+                >
                   <Text style={styles.commentInputAvatarText}>
                     {user?.name?.charAt(0).toUpperCase() || '?'}
                   </Text>
@@ -347,10 +391,13 @@ export default function ArtickleViewer() {
               )}
             </View>
             <TextInput
-              style={[styles.commentInput, { 
-                backgroundColor: isDark ? '#2a2a2a' : '#f0f2f5',
-                color: isDark ? '#fff' : '#333'
-              }]}
+              style={[
+                styles.commentInput,
+                {
+                  backgroundColor: isDark ? '#2a2a2a' : '#f0f2f5',
+                  color: isDark ? '#fff' : '#333',
+                },
+              ]}
               placeholder="Напиши коментар..."
               placeholderTextColor={isDark ? '#888' : '#999'}
               value={commentText}
@@ -358,18 +405,18 @@ export default function ArtickleViewer() {
               multiline
               maxLength={500}
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!commentText.trim() || isSubmitting) && styles.sendButtonDisabled
+                (!commentText.trim() || isSubmitting) && styles.sendButtonDisabled,
               ]}
               onPress={handleAddComment}
               disabled={!commentText.trim() || isSubmitting}
             >
-              <Ionicons 
-                name="send" 
-                size={20} 
-                color={commentText.trim() && !isSubmitting ? '#0347F2' : '#999'} 
+              <Ionicons
+                name="send"
+                size={20}
+                color={commentText.trim() && !isSubmitting ? '#0347F2' : '#999'}
               />
             </TouchableOpacity>
           </View>
@@ -391,7 +438,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 80,
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
@@ -488,15 +535,14 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
+    justifyContent: 'center',
     borderBottomWidth: 1,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 5,
     gap: 8,
   },
   actionButtonText: {
@@ -573,10 +619,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderTopWidth: 1,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
   commentInputWrapper: {
     flexDirection: 'row',
@@ -614,9 +656,6 @@ const styles = StyleSheet.create({
     maxHeight: 80,
   },
   sendButton: {
-    position: 'absolute',
-    right: 12,
-    bottom: 10,
     padding: 4,
   },
   sendButtonDisabled: {

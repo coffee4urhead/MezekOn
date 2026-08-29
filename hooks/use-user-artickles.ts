@@ -1,3 +1,4 @@
+import { useArtickleStore } from '@/components/stores/artickleStore';
 import { useCallback, useEffect, useState } from 'react';
 import { AppwriteException, ID, Query } from 'react-native-appwrite';
 import { databases } from './appwrite';
@@ -43,6 +44,7 @@ interface UseArticklesReturn {
   artickle: ArtickleData | null;
   loading: boolean;
   error: AppwriteException | null;
+  
   isCreating: boolean;
   isUpdating: boolean;
   isDeleting: boolean;
@@ -74,10 +76,25 @@ interface UseArticklesReturn {
 }
 
 export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
-  const [artickles, setArtickles] = useState<ArtickleData[]>([]);
-  const [artickle, setArtickle] = useState<ArtickleData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<AppwriteException | null>(null);
+  const {
+    artickles,
+    currentArtickle,
+    isLoading,
+    error,
+    setArtickles,
+    setCurrentArtickle,
+    setLoading,
+    setError,
+    optimisticAddArtickle,
+    optimisticUpdateArtickle,
+    optimisticDeleteArtickle,
+    optimisticIncrementViews,
+    optimisticIncrementLikes,
+    optimisticDecrementLikes,
+    optimisticIncrementComments,
+    rollbackArtickle,
+  } = useArtickleStore();
+
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,19 +136,19 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
         is_approved: response.is_approved || false,
       };
 
-      setArtickles(prev => [newArtickle, ...prev]);
-      setArtickle(newArtickle);
+      optimisticAddArtickle(newArtickle);
+      setCurrentArtickle(newArtickle);
       
       return newArtickle;
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error creating artickle:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       throw err;
     } finally {
       setIsCreating(false);
     }
-  }, []);
+  }, [optimisticAddArtickle, setCurrentArtickle, setError]);
 
   const updateArtickle = useCallback(async (input: UpdateArtickleInput): Promise<ArtickleData> => {
     try {
@@ -139,6 +156,8 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
       setError(null);
 
       const { id, ...updateData } = input;
+      
+      const previousState = artickles.find(a => a.$id === id);
       
       const response = await databases.updateDocument(
         DATABASE_ID,
@@ -160,23 +179,22 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
         views_count: response.views_count || 0,
         is_approved: response.is_approved || false,
       };
-
-      setArtickles(prev => prev.map(a => a.$id === id ? updatedArtickle : a));
+      optimisticUpdateArtickle(id, updatedArtickle);
       
-      if (artickle?.$id === id) {
-        setArtickle(updatedArtickle);
+      if (currentArtickle?.$id === id) {
+        setCurrentArtickle(updatedArtickle);
       }
       
       return updatedArtickle;
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error updating artickle:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       throw err;
     } finally {
       setIsUpdating(false);
     }
-  }, [artickle]);
+  }, [artickles, currentArtickle, optimisticUpdateArtickle, setCurrentArtickle, setError]);
 
   const deleteArtickle = useCallback(async (artickleId: string): Promise<void> => {
     try {
@@ -189,20 +207,20 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
         artickleId
       );
 
-      setArtickles(prev => prev.filter(a => a.$id !== artickleId));
+      optimisticDeleteArtickle(artickleId);
       
-      if (artickle?.$id === artickleId) {
-        setArtickle(null);
+      if (currentArtickle?.$id === artickleId) {
+        setCurrentArtickle(null);
       }
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error deleting artickle:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       throw err;
     } finally {
       setIsDeleting(false);
     }
-  }, [artickle]);
+  }, [currentArtickle, optimisticDeleteArtickle, setCurrentArtickle, setError]);
 
   const getArtickleById = useCallback(async (artickleId: string): Promise<ArtickleData | null> => {
     try {
@@ -228,14 +246,16 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
         is_approved: response.is_approved || false,
       };
 
+      setCurrentArtickle(artickleData);
+      
       return artickleData;
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching artickle:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return null;
     }
-  }, []);
+  }, [setCurrentArtickle, setError]);
 
   const fetchAllArtickles = useCallback(async (options?: { limit?: number; offset?: number }): Promise<ArtickleData[]> => {
     try {
@@ -273,18 +293,18 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
         views_count: doc.views_count || 0,
         is_approved: doc.is_approved || false,
       }));
-
       setArtickles(fetchedArtickles);
+      
       return fetchedArtickles;
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching artickles:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return [];
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setArtickles, setLoading, setError]);
 
   const fetchUserArtickles = useCallback(async (userId: string): Promise<ArtickleData[]> => {
     try {
@@ -315,16 +335,17 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
       }));
 
       setArtickles(userArtickles);
+      
       return userArtickles;
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching user artickles:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return [];
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setArtickles, setLoading, setError]);
 
   const fetchApprovedArtickles = useCallback(async (limit?: number): Promise<ArtickleData[]> => {
     try {
@@ -364,12 +385,12 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching approved artickles:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return [];
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading, setError]);
 
   const fetchPendingArtickles = useCallback(async (limit?: number): Promise<ArtickleData[]> => {
     try {
@@ -409,12 +430,12 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching pending artickles:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return [];
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading, setError]);
 
   const fetchTrendingArtickles = useCallback(async (limit: number = 10): Promise<ArtickleData[]> => {
     try {
@@ -450,25 +471,22 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error fetching trending artickles:', appwriteError.message);
-      setError(appwriteError);
+      setError(appwriteError.message);
       return [];
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setLoading, setError]);
 
   const incrementLikes = useCallback(async (artickleId: string): Promise<void> => {
     try {
-      const artickleToUpdate = artickles.find(a => a.$id === artickleId);
-      if (!artickleToUpdate) {
-        console.error('Artickle not found in local state:', artickleId);
+      const currentArtickleState = artickles.find(a => a.$id === artickleId);
+      if (!currentArtickleState) {
+        console.error('Artickle not found in store:', artickleId);
         return;
       }
       
-      console.log('Artickle to update: ', artickleToUpdate);
-      console.log('All artickles: ', artickles);
-      console.log('selected artickle id: ', artickleId);
-      const currentLikes = artickleToUpdate.likes_count || 0;
+      const currentLikes = currentArtickleState.likes_count || 0;
       
       await databases.updateDocument(
         DATABASE_ID,
@@ -478,34 +496,30 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
           likes_count: currentLikes + 1
         }
       );
-
-      setArtickles(prev => prev.map(a => 
-        a.$id === artickleId 
-          ? { ...a, likes_count: (a.likes_count || 0) + 1 }
-          : a
-      ));
-
-      if (artickle?.$id === artickleId) {
-        setArtickle(prev => prev ? { ...prev, likes_count: (prev.likes_count || 0) + 1 } : null);
-      }
-      console.log('after the update: ', artickleToUpdate);
+      
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error incrementing likes:', appwriteError.message);
-      setError(appwriteError);
+      
+      const previousState = artickles.find(a => a.$id === artickleId);
+      if (previousState) {
+        rollbackArtickle(artickleId, previousState);
+      }
+      
+      setError(appwriteError.message);
       throw err;
     }
-  }, [artickles, artickle]);
+  }, [artickles, optimisticIncrementLikes, rollbackArtickle, setError]);
 
   const decrementLikes = useCallback(async (artickleId: string): Promise<void> => {
     try {
-      const artickleToUpdate = artickles.find(a => a.$id === artickleId);
-      if (!artickleToUpdate) {
-        console.error('Artickle not found in local state:', artickleId);
+      const currentArtickleState = artickles.find(a => a.$id === artickleId);
+      if (!currentArtickleState) {
+        console.error('Artickle not found in store:', artickleId);
         return;
       }
-
-      const currentLikes = artickleToUpdate.likes_count || 0;
+      
+      const currentLikes = currentArtickleState.likes_count || 0;
       const newLikes = Math.max(0, currentLikes - 1);
       
       await databases.updateDocument(
@@ -516,91 +530,83 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
           likes_count: newLikes
         }
       );
-
-      setArtickles(prev => prev.map(a => 
-        a.$id === artickleId 
-          ? { ...a, likes_count: Math.max(0, (a.likes_count || 0) - 1) }
-          : a
-      ));
-
-      if (artickle?.$id === artickleId) {
-        setArtickle(prev => prev ? { ...prev, likes_count: Math.max(0, (prev.likes_count || 0) - 1) } : null);
-      }
+      
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error decrementing likes:', appwriteError.message);
-      setError(appwriteError);
+      
+      const previousState = artickles.find(a => a.$id === artickleId);
+      if (previousState) {
+        rollbackArtickle(artickleId, previousState);
+      }
+      
+      setError(appwriteError.message);
       throw err;
     }
-  }, [artickles, artickle]);
+  }, [artickles, optimisticDecrementLikes, rollbackArtickle, setError]);
 
   const incrementComments = useCallback(async (artickleId: string): Promise<void> => {
     try {
-      const currentArtickle = artickles.find(a => a.$id === artickleId);
-      if (!currentArtickle) return;
-
+      const currentArtickleState = artickles.find(a => a.$id === artickleId);
+      if (!currentArtickleState) return;
+      
       await databases.updateDocument(
         DATABASE_ID,
         COLLECTION_ID,
         artickleId,
         {
-          comments_count: (currentArtickle.comments_count || 0) + 1
+          comments_count: (currentArtickleState.comments_count || 0) + 1
         }
       );
-
-      setArtickles(prev => prev.map(a => 
-        a.$id === artickleId 
-          ? { ...a, comments_count: (a.comments_count || 0) + 1 }
-          : a
-      ));
-
-      if (artickle?.$id === artickleId) {
-        setArtickle(prev => prev ? { ...prev, comments_count: (prev.comments_count || 0) + 1 } : null);
-      }
+      
     } catch (err) {
       const appwriteError = err as AppwriteException;
       console.error('Error incrementing comments:', appwriteError.message);
-      setError(appwriteError);
+      
+      const previousState = artickles.find(a => a.$id === artickleId);
+      if (previousState) {
+        rollbackArtickle(artickleId, previousState);
+      }
+      
+      setError(appwriteError.message);
       throw err;
     }
-  }, [artickles, artickle]);
+  }, [artickles, optimisticIncrementComments, rollbackArtickle, setError]);
 
-  // needs fixing 
   const incrementViews = useCallback(async (artickleId: string): Promise<void> => {
-  try {
-    const currentArtickle = await databases.getDocument(
-      DATABASE_ID,
-      COLLECTION_ID,
-      artickleId
-    );
-
-    const currentViews = currentArtickle.views_count || 0;
-    
-    await databases.updateDocument(
-      DATABASE_ID,
-      COLLECTION_ID,
-      artickleId,
-      {
-        views_count: currentViews + 1
+    try {
+      const currentArtickleState = artickles.find((a: ArtickleData) => a.$id === artickleId);
+      if (!currentArtickleState) {
+        console.error('Artickle not found in store:', artickleId);
+        return;
       }
-    );
 
-    setArtickles(prev => prev.map(a => 
-      a.$id === artickleId 
-        ? { ...a, views_count: (a.views_count || 0) + 1 }
-        : a
-    ));
-
-    if (artickle?.$id === artickleId) {
-      setArtickle(prev => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : null);
+      optimisticIncrementViews(artickleId);
+      
+      const currentViews = currentArtickleState.views_count || 0;
+      
+      await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTION_ID,
+        artickleId,
+        {
+          views_count: currentViews + 1
+        }
+      );
+      
+    } catch (err) {
+      const appwriteError = err as AppwriteException;
+      console.error('Error incrementing views:', appwriteError.message);
+      
+      const previousState = artickles.find(a => a.$id === artickleId);
+      if (previousState) {
+        rollbackArtickle(artickleId, previousState);
+      }
+      
+      setError(appwriteError.message);
+      throw err;
     }
-  } catch (err) {
-    const appwriteError = err as AppwriteException;
-    console.error('Error incrementing views:', appwriteError.message);
-    setError(appwriteError);
-    throw err;
-  }
-}, [artickle]);
+  }, [artickles, optimisticIncrementViews, rollbackArtickle, setError]);
 
   const approveArtickle = useCallback(async (artickleId: string): Promise<ArtickleData> => {
     return updateArtickle({
@@ -616,25 +622,28 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     });
   }, [updateArtickle]);
 
-  const setCurrentArtickle = useCallback((artickleData: ArtickleData | null) => {
-    setArtickle(artickleData);
-  }, []);
+  const setCurrentArtickleWrapper = useCallback((artickleData: ArtickleData | null) => {
+    setCurrentArtickle(artickleData);
+  }, [setCurrentArtickle]);
 
   const clearCurrentArtickle = useCallback(() => {
-    setArtickle(null);
-  }, []);
+    setCurrentArtickle(null);
+  }, [setCurrentArtickle]);
 
-  const resetError = useCallback(() => setError(null), []);
+  const resetError = useCallback(() => {
+    setError(null);
+  }, [setError]);
 
   const refresh = useCallback(async (): Promise<void> => {
     await fetchAllArtickles();
   }, [fetchAllArtickles]);
 
+
   useEffect(() => {
     if (initialArtickleId) {
       getArtickleById(initialArtickleId).then(artickleData => {
         if (artickleData) {
-          setArtickle(artickleData);
+          setCurrentArtickle(artickleData);
           setLoading(false);
         }
       });
@@ -645,9 +654,10 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
 
   return {
     artickles,
-    artickle,
-    loading,
-    error,
+    artickle: currentArtickle,
+    loading: isLoading,
+    error: error as AppwriteException | null,
+    
     isCreating,
     isUpdating,
     isDeleting,
@@ -674,7 +684,7 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     resetError,
     refresh,
     
-    setCurrentArtickle,
+    setCurrentArtickle: setCurrentArtickleWrapper,
     clearCurrentArtickle,
   };
 }

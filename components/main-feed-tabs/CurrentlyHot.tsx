@@ -1,39 +1,133 @@
+import { useArtickleStore, useHasArtickles, useIsEmpty } from '@/components/stores/artickleStore';
 import { useTheme } from '@/context/ThemeContext';
 import { useArtickles } from '@/hooks/use-user-artickles';
-import { useEffect, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ArtickleItem, { ArtickleItemInfo } from '../ArtickleItem';
 import CreateButton, { CreationScreen } from '../ui/CreateButton';
 
 export default function CurrentlyHot() {
   const { isDark } = useTheme();
-  const { fetchAllArtickles, loading, artickles } = useArtickles();
+  
+  const artickles = useArtickleStore((state) => state.artickles);
+  const isLoading = useArtickleStore((state) => state.isLoading);
+  const isRefreshing = useArtickleStore((state) => state.isRefreshing);
+  const error = useArtickleStore((state) => state.error);
+  const hasArtickles = useHasArtickles();
+  const isEmpty = useIsEmpty();
+  
+  const { 
+    fetchAllArtickles, 
+    refresh: refreshArtickles,
+    resetError,
+  } = useArtickles();
+  
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchAllArtickles();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      const timer = setTimeout(() => {
+        if (!isLoading && !isRefreshing) {
+          fetchAllArtickles();
+        }
+      }, 30000); 
+      
+      return () => clearTimeout(timer);
+    }, [isLoading, isRefreshing])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchAllArtickles();
+    await refreshArtickles();
     setRefreshing(false);
-  }
+  };
 
   const renderArtickleItem = ({ item }: { item: ArtickleItemInfo }) => (
-  <ArtickleItem
-    $id={item.$id}
-    author_id={item.author_id}
-    content={item.content}
-    media_urls={item.media_urls}
-    likes_count={item.likes_count}
-    comments_count={item.comments_count}
-    views_count={item.views_count}
-    title={item.title}
-    $createdAt={item.$createdAt}
-    $updatedAt={item.$updatedAt}
-  />
-);
+    <ArtickleItem
+      $id={item.$id}
+      author_id={item.author_id}
+      content={item.content}
+      media_urls={item.media_urls}
+      likes_count={item.likes_count}
+      comments_count={item.comments_count}
+      views_count={item.views_count}
+      title={item.title}
+      $createdAt={item.$createdAt}
+      $updatedAt={item.$updatedAt}
+    />
+  );
+
+  if (isLoading && artickles.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ActivityIndicator size="large" color="#0347F2" />
+      </View>
+    );
+  }
+
+  if (error && artickles.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <Text style={{ color: isDark ? '#ffffff' : '#333333', textAlign: 'center', marginBottom: 16 }}>
+          {error}
+        </Text>
+        <TouchableOpacity 
+          onPress={() => {
+            resetError();
+            fetchAllArtickles();
+          }}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryButtonText}>Опитай отново</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+              📅 Актуални събития
+            </Text>
+            <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
+              Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
+            </Text>
+          </View>
+          
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+              Последни публикации
+            </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: isDark ? '#888' : '#999' }]}>
+                Няма публикувани статии все още.
+              </Text>
+              <Text style={[styles.emptySubText, { color: isDark ? '#666' : '#bbb' }]}>
+                Бъдете първият, който сподели нещо!
+              </Text>
+            </View>
+          </View>
+
+        </ScrollView>
+        <CreateButton creationScreen={CreationScreen.Artickles}/>
+      </View>
+    );
+  }
 
   return (
     <View style={[
@@ -62,97 +156,20 @@ export default function CurrentlyHot() {
             Последни публикации
           </Text>
 
-          {artickles && (
-              <FlatList
-                data={artickles}
-                renderItem={renderArtickleItem}
-                keyExtractor={(item) => item.$id}
-                scrollEnabled={false}
-              />
+          {artickles && artickles.length > 0 ? (
+            <FlatList
+              data={artickles}
+              renderItem={renderArtickleItem}
+              keyExtractor={(item) => item.$id}
+              scrollEnabled={false}
+            />
+          ) : (
+            <Text style={[styles.emptyText, { color: isDark ? '#888' : '#999' }]}>
+              Няма публикувани статии
+            </Text>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📰 Последни статии
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Диалектните думи на Мезек
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              15 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Изследване на уникалните диалектни думи, характерни за региона на Мезек...
-            </Text>
-          </View>
-          
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Културно наследство
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              10 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Запазване на културното наследство чрез диалектния речник MezekON...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📚 Исторически статии
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Историята на диалекта
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              5 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Проследяване на развитието на диалекта в региона през последните 100 години...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            🎯 Предстоящи събития
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Работилница за диалект
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              25 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Заповядайте на работилница за изучаване и запазване на диалекта...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📖 Нови публикации
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Речник на диалектните думи
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              1 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Нова версия на речника с над 500 нови думи и изрази...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.bottomSpacing} />
       </ScrollView>
 
       <CreateButton creationScreen={CreationScreen.Artickles}/>
@@ -163,6 +180,11 @@ export default function CurrentlyHot() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
@@ -205,5 +227,30 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 50,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#0347F2',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
