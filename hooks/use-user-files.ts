@@ -101,6 +101,7 @@ interface UseUserFilesReturn {
   getFilesByType: (fileType: FileType) => UserFileData[];
   getProfilePhotoUrl: () => string | null;
   getCoverPhotoUrl: () => string | null;
+  getArtickleMediaFile: (fileId: string) => string;
   hasProfilePhoto: () => boolean;
   hasCoverPhoto: () => boolean;
   getAllApprovedHistoryArchives: () => Promise<UserFileData[]>;
@@ -132,6 +133,10 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   const getHistoryAudioCoverUrl = useCallback((fileId: string): string => {
     return `${endpoint}/storage/buckets/${uploadBucketsIds['history_audio_covers']}/files/${fileId}/view?project=${projectId}`;
   }, []);
+
+  const getArtickleMediaFile = useCallback((fileId: string): string => {
+    return `${endpoint}/storage/buckets/${uploadBucketsIds['artickle-media']}/files/${fileId}/view?project=${projectId}`;
+  }, [])
 
   const fetchUserFiles = useCallback(async (): Promise<void> => {
     if (!user_id) {
@@ -627,6 +632,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     getFilesByType,
     getProfilePhotoUrl,
     getCoverPhotoUrl,
+    getArtickleMediaFile,
     hasProfilePhoto,
     hasCoverPhoto,
     getAllApprovedHistoryArchives,

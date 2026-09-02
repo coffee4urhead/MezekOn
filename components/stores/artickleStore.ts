@@ -1,4 +1,5 @@
 import { ArtickleData } from '@/hooks/use-user-artickles';
+import { useUserFiles } from '@/hooks/use-user-files';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
@@ -240,6 +241,18 @@ export const useArtickleCount = () => {
   return useArtickleStore((state) => state.artickles.length);
 };
 
+export const useArtickleWithMediaUrls = (artickle_id: string) => {
+  const artickle = useArtickleStore((state) => state.artickles.find(a=> artickle_id === a.$id));
+
+  const { getArtickleMediaFile } = useUserFiles('');
+
+  if (!artickle) return null;
+
+  return {
+    ...artickle,
+    media_urls: artickle.media_urls?.map(id => getArtickleMediaFile(id)) || []
+  }
+}
 
 export const useBatchArtickleUpdates = () => {
   const batchUpdate = useArtickleStore((state) => state.batchUpdate);

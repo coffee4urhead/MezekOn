@@ -1,12 +1,16 @@
-import { client } from '@/hooks/appwrite';
 import { UserRole, UserRoleData, useUserRoles } from '@/hooks/use-user-roles';
 import { checkCurrentSession } from '@/scripts/util';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Account, ID } from 'react-native-appwrite';
+import { Account, ID, Query } from 'react-native-appwrite';
+import { client, databases } from '../hooks/appwrite';
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || '';
 const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '';
 const apiKey = process.env.EXPO_PUBLIC_APPWRITE_API_KEY || '';
+
+const userDB = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
+const userCollection = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_USER_FILES || '';
+const userPFPStorage = process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '';
 
 interface User {
   $id: string;
@@ -42,6 +46,7 @@ interface UserContextType {
   isAtLeastRole: (minRole: UserRole) => boolean;
   refreshRoles: () => Promise<void>;
   getUserById: (userId: string) => Promise<User | null>;
+getUserProfilePhoto: (userId: string) => Promise<string | null>;
   getCurrentUser: () => User | null;
 }
 
@@ -66,6 +71,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   } = useUserRoles(user?.$id || '');
 
   const account = new Account(client);
+
+  const getUserProfilePhoto = async (userId: string): Promise<string | null> => {
+  try {
+    const response = await databases.listDocuments(
+      userDB,
+      userCollection,
+      [
+        Query.equal('user_id', userId),
+        Query.equal('file_type', 'profile_photo'),
+        Query.limit(1)
+      ]
+    );
+
+    if (response.documents.length > 0) {
+      const fileData = response.documents[0];
+      const fileId = fileData.file_id;
+      return `${endpoint}/storage/buckets/${userPFPStorage}/files/${fileId}/view?project=${projectId}`;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching user profile photo:', error);
+    return null;
+  }
+};
 
   const getUserById = async (userId: string): Promise<User | null> => {
     if (userCache.has(userId)) {
@@ -331,6 +361,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       refreshRoles,
       getUserById,
       getCurrentUser,
+      getUserProfilePhoto
     }}>
       {children}
     </UserContext.Provider>

@@ -4,8 +4,14 @@ import { useUserFiles } from '@/hooks/use-user-files';
 import useLikes from '@/hooks/use-user-likes';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useArtickleStore } from './stores/artickleStore';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useArtickleStore, useArtickleWithMediaUrls } from './stores/artickleStore';
 import { useUserLikesStore } from './stores/useUserLikesStore';
 
 export interface ArtickleItemInfo {
@@ -43,7 +49,7 @@ export default function ArtickleItem({
   $updatedAt,
 }: ArtickleItemInfo) {
   const { getUserById, user } = useUser();
-  const { profilePhoto } = useUserFiles(author_id || '');
+  const { profilePhoto, getProfilePhotoUrl } = useUserFiles(author_id || '');
   const { isDark } = useTheme();
   const router = useRouter();
 
@@ -62,8 +68,12 @@ export default function ArtickleItem({
 
   const [authorName, setAuthorName] = useState<string>('Author');
   const [isLoading, setIsLoading] = useState(true);
+  const artickleWithMedia = useArtickleWithMediaUrls($id);
+  
+  const processedMediaUrls = artickleWithMedia?.media_urls || [];
 
   useEffect(() => {
+    getProfilePhotoUrl();
     const fetchAuthor = async () => {
       if (author_id) {
         const author = await getUserById(author_id);
@@ -187,6 +197,53 @@ export default function ArtickleItem({
     );
   };
 
+  const renderImageGrid = () => {
+    if (processedMediaUrls.length === 0) return null;
+
+    const imagesToShow = processedMediaUrls.slice(0, 4);
+    const remainingCount = processedMediaUrls.length - 4;
+
+    return (
+      <View style={styles.mediaContainer}>
+        <View style={styles.grid}>
+          {imagesToShow.map((url, index) => (
+            <TouchableOpacity
+              key={`${$id}-media-${index}`}
+              style={[
+                styles.gridItem,
+                processedMediaUrls.length === 1 && styles.singleImage,
+                processedMediaUrls.length === 2 && styles.twoImages,
+                processedMediaUrls.length === 3 && index === 0 && styles.firstOfThree,
+                processedMediaUrls.length === 3 && index > 0 && styles.lastOfThree,
+                processedMediaUrls.length >= 4 && styles.fourOrMore,
+                processedMediaUrls.length >= 4 && index === 0 && styles.gridTopLeft,
+                processedMediaUrls.length >= 4 && index === 1 && styles.gridTopRight,
+                processedMediaUrls.length >= 4 && index === 2 && styles.gridBottomLeft,
+                processedMediaUrls.length >= 4 && index === 3 && styles.gridBottomRight,
+              ]}
+              onPress={() => navigateToArtickleModalComponent($id)}
+              activeOpacity={0.9}
+            >
+              <Image
+                source={{ uri: url }}
+                style={styles.image}
+                resizeMode="cover"
+                onError={(e) => {
+                  console.log(`Failed to load image ${index} for artickle ${$id}`);
+                }}
+              />
+              {index === 3 && remainingCount > 0 && (
+                <View style={styles.overlay}>
+                  <Text style={styles.overlayText}>+{remainingCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <View
@@ -203,6 +260,7 @@ export default function ArtickleItem({
       </View>
     );
   }
+  const defaultProfileLogo = require('@/assets/icons/avatar.png');
 
   return (
     <TouchableOpacity
@@ -217,20 +275,21 @@ export default function ArtickleItem({
       activeOpacity={0.7}
     >
       <View style={styles.authorSection}>
-        <View style={styles.avatarContainer}>
-          {profilePhoto ? (
-            <Image
-              source={{ uri: profilePhoto.coverPhotoUrl }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarText}>
-                {authorName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
+        <View style={[styles.avatarContainer]}>
+  {profilePhoto?.fileUrl ? (
+    <Image
+      source={{ uri: profilePhoto.fileUrl }}
+      style={styles.avatar}
+    />
+  ) : (
+    <View style={[styles.avatar, styles.avatarPlaceholder, {backgroundColor: isDark ? '#fff' : '#f5f2f2'}]}>
+      <Image
+        source={defaultProfileLogo}
+        style={styles.defaultAvatarImage}
+      />
+    </View>
+  )}
+</View>
         <View style={styles.authorInfo}>
           <Text style={[styles.authorName, { color: isDark ? '#fff' : '#1a1a1a' }]}>
             {authorName}
@@ -253,18 +312,7 @@ export default function ArtickleItem({
         </Text>
       </View>
 
-      {media_urls && media_urls.length > 0 && (
-        <View
-          style={[
-            styles.mediaSection,
-            { backgroundColor: isDark ? '#333' : '#f0f4ff' },
-          ]}
-        >
-          <Text style={[styles.mediaCount, { color: isDark ? '#888' : '#0347F2' }]}>
-            📷 {media_urls.length} media files
-          </Text>
-        </View>
-      )}
+      {renderImageGrid()}
 
       <View
         style={[
@@ -314,7 +362,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarPlaceholder: {
-    backgroundColor: '#0347F2',
+    padding: 8, 
+    borderRadius: 24,
+  },
+  defaultAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   avatarText: {
     color: '#ffffff',
@@ -345,13 +399,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  mediaSection: {
+  mediaContainer: {
     marginBottom: 12,
-    padding: 8,
-    borderRadius: 8,
+    marginTop: 4,
   },
-  mediaCount: {
-    fontSize: 12,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  gridItem: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  singleImage: {
+    width: '100%',
+    height: 200,
+  },
+  twoImages: {
+    width: '49%',
+    height: 180,
+  },
+  firstOfThree: {
+    width: '100%',
+    height: 180,
+  },
+  lastOfThree: {
+    width: '49%',
+    height: 120,
+  },
+  fourOrMore: {
+    width: '49%',
+    height: 140,
+  },
+  gridTopLeft: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  gridTopRight: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  gridBottomLeft: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  gridBottomRight: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayText: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: 'bold',
   },
   statsSection: {
     flexDirection: 'row',
