@@ -48,13 +48,17 @@ interface UseArticklesReturn {
   isCreating: boolean;
   isUpdating: boolean;
   isDeleting: boolean;
-  
+
   createArtickle: (input: CreateArtickleInput) => Promise<ArtickleData>;
   updateArtickle: (input: UpdateArtickleInput) => Promise<ArtickleData>;
   deleteArtickle: (artickleId: string) => Promise<void>;
   getArtickleById: (artickleId: string) => Promise<ArtickleData | null>;
   
-  fetchAllArtickles: (options?: { limit?: number; offset?: number }) => Promise<ArtickleData[]>;
+  fetchAllArtickles: (options?: { 
+    limit?: number; 
+    offset?: number;
+    page?: number;  
+  }) => Promise<ArtickleData[]>;
   fetchUserArtickles: (userId: string) => Promise<ArtickleData[]>;
   fetchApprovedArtickles: (limit?: number) => Promise<ArtickleData[]>;
   fetchPendingArtickles: (limit?: number) => Promise<ArtickleData[]>;
@@ -257,54 +261,70 @@ export function useArtickles(initialArtickleId?: string): UseArticklesReturn {
     }
   }, [setCurrentArtickle, setError]);
 
-  const fetchAllArtickles = useCallback(async (options?: { limit?: number; offset?: number }): Promise<ArtickleData[]> => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchAllArtickles = useCallback(async (options?: { 
+  limit?: number; 
+  offset?: number;
+  page?: number;
+}): Promise<ArtickleData[]> => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      const queries: any[] = [
-        Query.equal('is_approved', true),
-        Query.orderDesc('$createdAt')
-      ];
+    const queries: any[] = [
+      Query.equal('is_approved', true),
+      Query.orderDesc('$createdAt')
+    ];
 
+    if (options?.page !== undefined) {
+      const limit = options?.limit || 20;
+      const offset = (options.page - 1) * limit;
+      queries.push(Query.limit(limit));
+      queries.push(Query.offset(offset));
+    } else {
       if (options?.limit) {
         queries.push(Query.limit(options.limit));
       }
       if (options?.offset) {
         queries.push(Query.offset(options.offset));
       }
-
-      const response = await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTION_ID,
-        queries
-      );
-
-      const fetchedArtickles: ArtickleData[] = response.documents.map(doc => ({
-        $id: doc.$id,
-        $createdAt: doc.$createdAt,
-        $updatedAt: doc.$updatedAt,
-        title: doc.title,
-        content: doc.content,
-        author_id: doc.author_id,
-        media_urls: doc.media_urls || [],
-        likes_count: doc.likes_count || 0,
-        comments_count: doc.comments_count || 0,
-        views_count: doc.views_count || 0,
-        is_approved: doc.is_approved || false,
-      }));
-      setArtickles(fetchedArtickles);
-      
-      return fetchedArtickles;
-    } catch (err) {
-      const appwriteError = err as AppwriteException;
-      console.error('Error fetching artickles:', appwriteError.message);
-      setError(appwriteError.message);
-      return [];
-    } finally {
-      setLoading(false);
     }
-  }, [setArtickles, setLoading, setError]);
+
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTION_ID,
+      queries
+    );
+
+    const fetchedArtickles: ArtickleData[] = response.documents.map(doc => ({
+      $id: doc.$id,
+      $createdAt: doc.$createdAt,
+      $updatedAt: doc.$updatedAt,
+      title: doc.title,
+      content: doc.content,
+      author_id: doc.author_id,
+      media_urls: doc.media_urls || [],
+      likes_count: doc.likes_count || 0,
+      comments_count: doc.comments_count || 0,
+      views_count: doc.views_count || 0,
+      is_approved: doc.is_approved || false,
+    }));
+    
+    if (options?.page && options.page > 1) {
+      setArtickles([...artickles, ...fetchedArtickles]);
+    } else {
+      setArtickles(fetchedArtickles);
+    }
+    
+    return fetchedArtickles;
+  } catch (err) {
+    const appwriteError = err as AppwriteException;
+    console.error('Error fetching artickles:', appwriteError.message);
+    setError(appwriteError.message);
+    return [];
+  } finally {
+    setLoading(false);
+  }
+}, [setArtickles, setLoading, setError, artickles]); 
 
   const fetchUserArtickles = useCallback(async (userId: string): Promise<ArtickleData[]> => {
     try {

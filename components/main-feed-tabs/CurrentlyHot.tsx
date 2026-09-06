@@ -11,6 +11,13 @@ export default function CurrentlyHot() {
   const { isDark } = useTheme();
   
   const artickles = useArtickleStore((state) => state.artickles);
+  const isHydrated = useArtickleStore((state) => state.isHydrated);
+  const hasMore = useArtickleStore((state) => state.hasMore);
+  const setHasMore = useArtickleStore((state) => state.setHasMore);
+  const setArtickles = useArtickleStore((state) => state.setArtickles);
+  const page = useArtickleStore((state) => state.page);
+  const setPage = useArtickleStore((state) => state.setPage);
+  const lastUpdated = useArtickleStore((state) => state.lastUpdated);
   const isLoading = useArtickleStore((state) => state.isLoading);
   const isRefreshing = useArtickleStore((state) => state.isRefreshing);
   const error = useArtickleStore((state) => state.error);
@@ -27,24 +34,55 @@ export default function CurrentlyHot() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+  if (isHydrated) {
     fetchAllArtickles();
-  }, []);
+  }
+}, [isHydrated]);
+
+const shouldRefresh = useCallback(() => {
+  if (artickles.length === 0) return true; 
+  
+  if (!lastUpdated) return true;
+  
+  const timeSinceUpdate = Date.now() - new Date(lastUpdated).getTime();
+  const STALE_TIME = 5 * 60 * 1000; 
+  
+  return timeSinceUpdate > STALE_TIME;
+}, [artickles.length, lastUpdated]);
 
   useFocusEffect(
-    useCallback(() => {
-      const timer = setTimeout(() => {
-        if (!isLoading && !isRefreshing) {
-          fetchAllArtickles();
-        }
-      }, 30000); 
-      
-      return () => clearTimeout(timer);
-    }, [isLoading, isRefreshing])
-  );
+  useCallback(() => {
+    if (shouldRefresh()) {
+      fetchAllArtickles();
+    }
+  }, [shouldRefresh])
+);
+
+const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+const loadMore = useCallback(async () => {
+  if (isLoadingMore || isLoading || !hasMore) return;
+  
+  setIsLoadingMore(true);
+  try {
+    const offset = page * 20;
+    const newData = await fetchAllArtickles({ limit: 20, offset });
+    setArtickles([...artickles, ...newData]);
+    setPage(page + 1);
+    setHasMore(newData.length > 0);
+  } catch (error) {
+    console.error('Failed to load more:', error);
+  } finally {
+    setIsLoadingMore(false);
+  }
+}, [isLoadingMore, isLoading, hasMore, page, artickles, fetchAllArtickles, setArtickles, setPage, setHasMore]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await refreshArtickles();
+    setRefreshing(false);
+    setPage(1); 
+    setHasMore(true); 
     setRefreshing(false);
   };
 
@@ -161,8 +199,17 @@ export default function CurrentlyHot() {
             <FlatList
               data={artickles}
               renderItem={renderArtickleItem}
-              keyExtractor={(item) => item.$id}
+              keyExtractor={(item, index) => `${item.$id}-${index}`}
               scrollEnabled={false}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+    isLoading && artickles.length > 0 ? (
+      <View style={{ padding: 20 }}>
+        <ActivityIndicator size="small" color="#0347F2" />
+      </View>
+    ) : null
+  }
             />
           ) : (
             <Text style={[styles.emptyText, { color: isDark ? '#888' : '#999' }]}>
