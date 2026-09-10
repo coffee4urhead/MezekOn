@@ -32,6 +32,13 @@ export function LayoutWithNowPlaying() {
                   }}
                 />
                 <Stack.Screen 
+                  name="ArtickleViewer" 
+                  options={{ 
+                    presentation: 'modal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen 
                   name="AudioPlayerScreen" 
                   options={{ 
                     presentation: 'card',

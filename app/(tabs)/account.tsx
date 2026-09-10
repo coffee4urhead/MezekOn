@@ -9,6 +9,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { RNFile, UserFileData, useUserFiles } from '../../hooks/use-user-files';
 import { useUserSideInformation } from '../../hooks/use-user-side-info';
 
+// use UseLocalSearchParams and give it only the user id. Then make the check if the given id is the id of the original owner of the account
 export default function AboutScreen() {
   const { isDark } = useTheme();
   const {

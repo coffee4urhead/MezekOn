@@ -1,9 +1,173 @@
+import { useArtickleStore, useHasArtickles, useIsEmpty } from '@/components/stores/artickleStore';
 import { useTheme } from '@/context/ThemeContext';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useArtickles } from '@/hooks/use-user-artickles';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ArtickleItem, { ArtickleItemInfo } from '../ArtickleItem';
+import CreateButton, { CreationScreen } from '../ui/CreateButton';
 
 export default function CurrentlyHot() {
   const { isDark } = useTheme();
   
+  const artickles = useArtickleStore((state) => state.artickles);
+  const isHydrated = useArtickleStore((state) => state.isHydrated);
+  const hasMore = useArtickleStore((state) => state.hasMore);
+  const setHasMore = useArtickleStore((state) => state.setHasMore);
+  const setArtickles = useArtickleStore((state) => state.setArtickles);
+  const page = useArtickleStore((state) => state.page);
+  const setPage = useArtickleStore((state) => state.setPage);
+  const lastUpdated = useArtickleStore((state) => state.lastUpdated);
+  const isLoading = useArtickleStore((state) => state.isLoading);
+  const isRefreshing = useArtickleStore((state) => state.isRefreshing);
+  const error = useArtickleStore((state) => state.error);
+  const hasArtickles = useHasArtickles();
+  const isEmpty = useIsEmpty();
+  
+
+  const { 
+    fetchAllArtickles, 
+    refresh: refreshArtickles,
+    resetError,
+  } = useArtickles();
+  
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+  if (isHydrated) {
+    fetchAllArtickles();
+  }
+}, [isHydrated]);
+
+const shouldRefresh = useCallback(() => {
+  if (artickles.length === 0) return true; 
+  
+  if (!lastUpdated) return true;
+  
+  const timeSinceUpdate = Date.now() - new Date(lastUpdated).getTime();
+  const STALE_TIME = 5 * 60 * 1000; 
+  
+  return timeSinceUpdate > STALE_TIME;
+}, [artickles.length, lastUpdated]);
+
+  useFocusEffect(
+  useCallback(() => {
+    if (shouldRefresh()) {
+      fetchAllArtickles();
+    }
+  }, [shouldRefresh])
+);
+
+const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+const loadMore = useCallback(async () => {
+  if (isLoadingMore || isLoading || !hasMore) return;
+  
+  setIsLoadingMore(true);
+  try {
+    const offset = page * 20;
+    const newData = await fetchAllArtickles({ limit: 20, offset });
+    setArtickles([...artickles, ...newData]);
+    setPage(page + 1);
+    setHasMore(newData.length > 0);
+  } catch (error) {
+    console.error('Failed to load more:', error);
+  } finally {
+    setIsLoadingMore(false);
+  }
+}, [isLoadingMore, isLoading, hasMore, page, artickles, fetchAllArtickles, setArtickles, setPage, setHasMore]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshArtickles();
+    setRefreshing(false);
+    setPage(1); 
+    setHasMore(true); 
+    setRefreshing(false);
+  };
+
+  const renderArtickleItem = ({ item }: { item: ArtickleItemInfo }) => (
+    <ArtickleItem
+      $id={item.$id}
+      author_id={item.author_id}
+      content={item.content}
+      media_urls={item.media_urls}
+      likes_count={item.likes_count}
+      comments_count={item.comments_count}
+      views_count={item.views_count}
+      title={item.title}
+      $createdAt={item.$createdAt}
+      $updatedAt={item.$updatedAt}
+    />
+  );
+
+  if (isLoading && artickles.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ActivityIndicator size="large" color="#0347F2" />
+      </View>
+    );
+  }
+
+  if (error && artickles.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <Text style={{ color: isDark ? '#ffffff' : '#333333', textAlign: 'center', marginBottom: 16 }}>
+          {error}
+        </Text>
+        <TouchableOpacity 
+          onPress={() => {
+            resetError();
+            fetchAllArtickles();
+          }}
+          style={styles.retryButton}
+        >
+          <Text style={styles.retryButtonText}>Опитай отново</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+              📅 Актуални събития
+            </Text>
+            <Text style={[styles.sectionText, { color: isDark ? '#cccccc' : '#666666' }]}>
+              Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
+            </Text>
+          </View>
+          
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
+              Последни публикации
+            </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: isDark ? '#888' : '#999' }]}>
+                Няма публикувани статии все още.
+              </Text>
+              <Text style={[styles.emptySubText, { color: isDark ? '#666' : '#bbb' }]}>
+                Бъдете първият, който сподели нещо!
+              </Text>
+            </View>
+          </View>
+
+        </ScrollView>
+        <CreateButton creationScreen={CreationScreen.Artickles}/>
+      </View>
+    );
+  }
+
   return (
     <View style={[
       styles.container, 
@@ -13,6 +177,9 @@ export default function CurrentlyHot() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
@@ -22,89 +189,38 @@ export default function CurrentlyHot() {
             Следете тази страница за най-новите събития и статии свързани с диалекта на регион Мезек.
           </Text>
         </View>
-
+        
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📰 Последни статии
+            Последни публикации
           </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Диалектните думи на Мезек
+
+          {artickles && artickles.length > 0 ? (
+            <FlatList
+              data={artickles}
+              renderItem={renderArtickleItem}
+              keyExtractor={(item, index) => `${item.$id}-${index}`}
+              scrollEnabled={false}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+    isLoading && artickles.length > 0 ? (
+      <View style={{ padding: 20 }}>
+        <ActivityIndicator size="small" color="#0347F2" />
+      </View>
+    ) : null
+  }
+            />
+          ) : (
+            <Text style={[styles.emptyText, { color: isDark ? '#888' : '#999' }]}>
+              Няма публикувани статии
             </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              15 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Изследване на уникалните диалектни думи, характерни за региона на Мезек...
-            </Text>
-          </View>
-          
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Културно наследство
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              10 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Запазване на културното наследство чрез диалектния речник MezekON...
-            </Text>
-          </View>
+          )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📚 Исторически статии
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Историята на диалекта
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              5 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Проследяване на развитието на диалекта в региона през последните 100 години...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            🎯 Предстоящи събития
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Работилница за диалект
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              25 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Заповядайте на работилница за изучаване и запазване на диалекта...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-            📖 Нови публикации
-          </Text>
-          <View style={styles.articleCard}>
-            <Text style={[styles.articleTitle, { color: isDark ? '#ffffff' : '#333333' }]}>
-              Речник на диалектните думи
-            </Text>
-            <Text style={[styles.articleDate, { color: isDark ? '#888888' : '#999999' }]}>
-              1 Март 2024
-            </Text>
-            <Text style={[styles.articleText, { color: isDark ? '#cccccc' : '#666666' }]}>
-              Нова версия на речника с над 500 нови думи и изрази...
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      <CreateButton creationScreen={CreationScreen.Artickles}/>
     </View>
   );
 }
@@ -112,6 +228,11 @@ export default function CurrentlyHot() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
@@ -154,5 +275,30 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 50,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#0347F2',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

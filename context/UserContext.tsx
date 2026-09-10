@@ -1,8 +1,16 @@
-import { client } from '@/hooks/appwrite';
 import { UserRole, UserRoleData, useUserRoles } from '@/hooks/use-user-roles';
 import { checkCurrentSession } from '@/scripts/util';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Account, ID } from 'react-native-appwrite';
+import { Account, ID, Query } from 'react-native-appwrite';
+import { client, databases } from '../hooks/appwrite';
+
+const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT || '';
+const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID || '';
+const apiKey = process.env.EXPO_PUBLIC_APPWRITE_API_KEY || '';
+
+const userDB = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_ID || '';
+const userCollection = process.env.EXPO_PUBLIC_DATABASE_USER_PROFILES_USER_FILES || '';
+const userPFPStorage = process.env.EXPO_PUBLIC_STORAGE_USER_PFP_BUCKET_ID || '';
 
 interface User {
   $id: string;
@@ -11,8 +19,10 @@ interface User {
   emailVerification?: boolean;
   phone?: string;
   role?: UserRole;
-  roles?: UserRole[]; 
+  roles?: UserRole[];
   roleData?: UserRoleData[];
+  profilePhoto?: string;
+  coverPhoto?: string;
   [key: string]: any;
 }
 
@@ -35,6 +45,9 @@ interface UserContextType {
   getHighestRole: () => UserRoleData | null;
   isAtLeastRole: (minRole: UserRole) => boolean;
   refreshRoles: () => Promise<void>;
+  getUserById: (userId: string) => Promise<User | null>;
+getUserProfilePhoto: (userId: string) => Promise<string | null>;
+  getCurrentUser: () => User | null;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -45,130 +58,187 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
 
   const {
-    roles,
     activeRoles,
     loading: rolesLoading,
-    error: rolesError,
-    isUpdating,
     fetchUserRoles,
-    assignRole,
-    revokeRole,
-    deactivateRole,
-    activateRole,
-    hasRole: hasRoleFn,
-    hasAnyRole: hasAnyRoleFn,
-    hasAllRoles: hasAllRolesFn,
-    getRolesByRegion,
     getHighestRole: getHighestRoleFn,
-    getRolePermissions,
-    getRoleHierarchyLevel,
     isAtLeastRole: isAtLeastRoleFn,
-    canPerformAction,
-    resetError,
     refresh,
     createDefaultRole
   } = useUserRoles(user?.$id || '');
 
   const account = new Account(client);
 
-  const checkSession = async () => {
+  const getUserProfilePhoto = async (userId: string): Promise<string | null> => {
   try {
-    setIsLoading(true);
-    const session = await checkCurrentSession();
+    const response = await databases.listDocuments(
+      userDB,
+      userCollection,
+      [
+        Query.equal('user_id', userId),
+        Query.equal('file_type', 'profile_photo'),
+        Query.limit(1)
+      ]
+    );
+
+    if (response.documents.length > 0) {
+      const fileData = response.documents[0];
+      const fileId = fileData.file_id;
+      return `${endpoint}/storage/buckets/${userPFPStorage}/files/${fileId}/view?project=${projectId}`;
+    }
     
-    if (session) {
+    return null;
+  } catch (error) {
+    console.error('Error fetching user profile photo:', error);
+    return null;
+  }
+};
+
+  const getUserById = async (userId: string): Promise<User | null> => {
+    if (userCache.has(userId)) {
+        return userCache.get(userId) || null;
+    }
+
+    try {
+        const response = await fetch(`${endpoint}/users/${userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Appwrite-Project': projectId,
+                'X-Appwrite-Response-Format': '1.0.0',
+                'X-Appwrite-Key': apiKey,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch user: ${response.status}`);
+        }
+
+        const userData = await response.json();
+
+        const formattedUser: User = {
+            $id: userData.$id,
+            email: userData.email || '',
+            name: userData.name || 'User',
+            emailVerification: userData.emailVerification || false,
+            phone: userData.phone || '',
+            ...userData
+        };
+
+        setUserCache(prev => new Map(prev).set(userId, formattedUser));
+        
+        return formattedUser;
+    } catch (error) {
+        console.error('Error fetching user by ID:', error);
+        return {
+            $id: userId,
+            email: '',
+            name: 'Unknown User',
+        };
+    }
+};
+
+  const getCurrentUser = (): User | null => {
+    return user;
+  };
+
+  const checkSession = async () => {
+    try {
+      setIsLoading(true);
+      const session = await checkCurrentSession();
+      
+      if (session) {
+        const userData = await account.get();
+        
+        if (userData.$id) {
+          try {
+            await fetchUserRoles();
+            
+            const highestRoleData = getHighestRoleFn();
+            const highestRole: UserRole | undefined = highestRoleData ? highestRoleData.role as UserRole : undefined;
+            
+            setUser({
+              ...userData,
+              roles: activeRoles.map(role => role.role as UserRole),
+              role: highestRole,
+              roleData: activeRoles,
+            });
+          } catch (roleError) {
+            console.error('Failed to fetch roles:', roleError);
+            setUser({
+              ...userData,
+              roles: [],
+              role: undefined,
+              roleData: [],
+            });
+          }
+        } else {
+          setUser(userData);
+        }
+        
+        setIsLoggedIn(true);
+        setEmail(userData.email);
+      } else {
+        setUser(null);
+        setIsLoggedIn(false);
+      }
+    } catch (error) {
+      console.error('Session check failed:', error);
+      setUser(null);
+      setIsLoggedIn(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (emailInput: string, passwordInput: string) => {
+    try {
+      setIsLoading(true);
+      
+      try {
+        await account.deleteSession('current');
+      } catch (e) {
+      }
+      
+      await account.createEmailPasswordSession(emailInput, passwordInput);
       const userData = await account.get();
+      
+      let roleNames: UserRole[] = []; 
+      let highestRole: UserRole | undefined = undefined; 
       
       if (userData.$id) {
         try {
           await fetchUserRoles();
-          
-          const roleNames: UserRole[] = activeRoles.map(role => role.role as UserRole);
+          roleNames = activeRoles.map(role => role.role as UserRole);
           const highestRoleData = getHighestRoleFn();
-          const highestRole: UserRole | undefined = highestRoleData ? highestRoleData.role as UserRole : undefined;
-          
-          console.log('User with id' + user?.$id + 'has these roles' + activeRoles.join(', ').toString());
-          setUser({
-            ...userData,
-            roles: roleNames,
-            role: highestRole,
-            roleData: activeRoles,
-          });
+          highestRole = highestRoleData ? highestRoleData.role as UserRole : undefined;
         } catch (roleError) {
-          console.error('Failed to fetch roles:', roleError);
-          setUser({
-            ...userData,
-            roles: [],
-            role: undefined,
-            roleData: [],
-          });
+          console.error('Failed to fetch roles during login:', roleError);
         }
-      } else {
-        setUser(userData);
       }
       
+      setUser({
+        ...userData,
+        roles: roleNames,
+        role: highestRole,
+        roleData: activeRoles,
+      });
+      
       setIsLoggedIn(true);
-      setEmail(userData.email);
-    } else {
-      setUser(null);
-      setIsLoggedIn(false);
+      setEmail(emailInput);
+      setPassword(passwordInput);
+      
+      console.log('Login successful');
+    } catch (error: any) {
+      console.error('Login failed:', error.message);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Session check failed:', error);
-    setUser(null);
-    setIsLoggedIn(false);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-  const login = async (emailInput: string, passwordInput: string) => {
-  try {
-    setIsLoading(true);
-    
-    try {
-      await account.deleteSession('current');
-    } catch (e) {
-    }
-    
-    const session = await account.createEmailPasswordSession(emailInput, passwordInput);
-    const userData = await account.get();
-    
-    let roleNames: UserRole[] = []; 
-    let highestRole: UserRole | undefined = undefined; 
-    
-    if (userData.$id) {
-      try {
-        await fetchUserRoles();
-        roleNames = activeRoles.map(role => role.role as UserRole);
-        const highestRoleData = getHighestRoleFn();
-        highestRole = highestRoleData ? highestRoleData.role as UserRole : undefined;
-      } catch (roleError) {
-        console.error('Failed to fetch roles during login:', roleError);
-      }
-    }
-    
-    setUser({
-      ...userData,
-      roles: roleNames,
-      role: highestRole,
-      roleData: activeRoles,
-    });
-    
-    setIsLoggedIn(true);
-    setEmail(emailInput);
-    setPassword(passwordInput);
-    
-    console.log('✅ Login successful:', session);
-  } catch (error: any) {
-    console.error('Login failed:', error.message);
-    throw error;
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const register = async (emailInput: string, passwordInput: string) => {
     try {
@@ -186,31 +256,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         emailInput.split('@')[0]
       );
       
-      console.log('✅ Account created:', newUser);
-    
-    let defaultRole: UserRoleData | null = null;
-    try {
-      defaultRole = await createDefaultRole(newUser.$id);
-      console.log('✅ Default explorer role created:', defaultRole);
-    } catch (roleError) {
-      console.error('Failed to create default role:', roleError);
-    }
-    
-    const session = await account.createEmailPasswordSession(emailInput, passwordInput);
-    const userData = await account.get();
-    
-    setUser({
-      ...userData,
-      roles: defaultRole ? [defaultRole.role] : [],
-      role: defaultRole ? 'explorer' : undefined,
-      roleData: defaultRole ? [defaultRole] : [],
-    });
-    
-    setIsLoggedIn(true);
-    setEmail(emailInput);
-    setPassword(passwordInput);
+      console.log('Account created:', newUser);
       
-      console.log('✅ Login successful after registration:', session);
+      let defaultRole: UserRoleData | null = null;
+      try {
+        defaultRole = await createDefaultRole(newUser.$id);
+        console.log('Default explorer role created:', defaultRole);
+      } catch (roleError) {
+        console.error('Failed to create default role:', roleError);
+      }
+      
+      await account.createEmailPasswordSession(emailInput, passwordInput);
+      const userData = await account.get();
+      
+      setUser({
+        ...userData,
+        roles: defaultRole ? [defaultRole.role] : [],
+        role: defaultRole ? 'explorer' : undefined,
+        roleData: defaultRole ? [defaultRole] : [],
+      });
+      
+      setIsLoggedIn(true);
+      setEmail(emailInput);
+      setPassword(passwordInput);
+      
+      console.log('Registration and login successful');
     } catch (error: any) {
       console.error('Registration failed:', error.message);
       throw error;
@@ -227,7 +297,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setIsLoggedIn(false);
       setEmail('');
       setPassword('');
-      console.log('✅ Logged out successfully');
+      console.log('Logged out successfully');
     } catch (error: any) {
       console.error('Logout failed:', error.message);
       throw error;
@@ -242,15 +312,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const hasRole = (roleName: UserRole): boolean => {
-    return hasRoleFn(roleName);
+    return activeRoles.some(role => role.role === roleName && role.is_active);
   };
 
   const hasAnyRole = (roleNames: UserRole[]): boolean => {
-    return hasAnyRoleFn(roleNames);
+    return roleNames.some(role => hasRole(role));
   };
 
   const hasAllRoles = (roleNames: UserRole[]): boolean => {
-    return hasAllRolesFn(roleNames);
+    return roleNames.every(role => hasRole(role));
   };
 
   const getHighestRole = (): UserRoleData | null => {
@@ -289,6 +359,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       getHighestRole,
       isAtLeastRole,
       refreshRoles,
+      getUserById,
+      getCurrentUser,
+      getUserProfilePhoto
     }}>
       {children}
     </UserContext.Provider>
