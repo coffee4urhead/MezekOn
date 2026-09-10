@@ -1,4 +1,5 @@
 import ThemeToggleButton from '@/components/CustomHeader';
+import ModMainScreen from '@/components/moderator-part-components/ModMainScreen';
 import { useTheme } from '@/context/ThemeContext';
 import { useUser } from '@/context/UserContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -86,23 +87,27 @@ export default function HomeScreen() {
 
   if (isLoggedIn && user) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
-        <ThemeToggleButton />
-        <View style={styles.loggedInContainer}>
-          <Text style={[styles.welcomeText, { color: isDark ? '#ffffff' : '#000000' }]}>
-            Добре дошли!
-          </Text>
-          <Text style={[styles.emailText, { color: isDark ? '#888888' : '#666666' }]}>
-            {user.email}
-          </Text>
-          <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
-            {user.name}
-          </Text>
-          <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
-            {user.role ? <Text>{user.role}</Text> : <Text>No roles</Text>}
-          </Text>
-        </View>
+      <View style={styles.container}>
+      <ThemeToggleButton/>
+      <ModMainScreen/>
       </View>
+      // <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+      //   <ThemeToggleButton />
+      //   <View style={styles.loggedInContainer}>
+      //     <Text style={[styles.welcomeText, { color: isDark ? '#ffffff' : '#000000' }]}>
+      //       Добре дошли!
+      //     </Text>
+      //     <Text style={[styles.emailText, { color: isDark ? '#888888' : '#666666' }]}>
+      //       {user.email}
+      //     </Text>
+      //     <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
+      //       {user.name}
+      //     </Text>
+      //     <Text style={[styles.nameText, { color: isDark ? '#888888' : '#666666' }]}>
+      //       {user.role ? <Text>{user.role}</Text> : <Text>No roles</Text>}
+      //     </Text>
+      //   </View>
+      // </View>
     );
   }
 
