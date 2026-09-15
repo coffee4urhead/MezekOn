@@ -1,30 +1,9 @@
 import { useTheme } from '@/context/ThemeContext';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useModerationSync } from '@/hooks/useModerationSync';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useModeratorCountReportedComments, useModeratorStorage } from '../stores/moderatorStore';
 import ModActionCard from './ModActionCard';
 import ModSecondaryCardsAction from './ModSecondaryCardsAction';
-
-const actionCardsInfo = [
-    {
-        'card-title': 'Коментари за преглед',
-        'card-info': '12',
-        'card-logo': require('@/assets/icons/comment.png')
-    },
-    {
-        'card-title': 'Аудио записи за преглед',
-        'card-info': '5',
-        'card-logo': require('@/assets/icons/audio-waves.png')
-    },
-    {
-        'card-title': 'Документи (PDF) за преглед',
-        'card-info': '3',
-        'card-logo': require('@/assets/icons/file.png')
-    },
-    {
-        'card-title': 'Сигнали от потребители',
-        'card-info': '0',
-        'card-logo': require('@/assets/icons/flag.png')
-    }
-]
 
 const latestActionsCards = [
     {
@@ -50,6 +29,37 @@ const latestActionsCards = [
 export default function ModMainScreen() {
     const { isDark } = useTheme();
     const mezekonLogo = require('@/assets/icons/logo.png');
+    
+    useModerationSync();
+    
+    const isHydrated = useModeratorStorage((s) => s.isHydrated);
+    const isLoading = useModeratorStorage((s) => s.isLoading);
+    const repComCount = useModeratorCountReportedComments();
+    const unapprovedAudioIds=  useModeratorStorage((state) => state.audioFilesForModerationIds.length);
+    const unapprovedPdfIds = useModeratorStorage((state) => state.pdfArchivesForModerationIds.length);
+
+    const actionCardsInfo = [
+    {
+        'card-title': 'Коментари за преглед',
+        'card-info': repComCount,
+        'card-logo': require('@/assets/icons/comment.png')
+    },
+    {
+        'card-title': 'Аудио записи за преглед',
+        'card-info': unapprovedAudioIds,
+        'card-logo': require('@/assets/icons/audio-waves.png')
+    },
+    {
+        'card-title': 'Документи (PDF) за преглед',
+        'card-info': unapprovedPdfIds,
+        'card-logo': require('@/assets/icons/file.png')
+    },
+    {
+        'card-title': 'Сигнали от потребители',
+        'card-info': '0',
+        'card-logo': require('@/assets/icons/flag.png')
+    }
+]
 
     return (
         <ScrollView
@@ -71,14 +81,16 @@ export default function ModMainScreen() {
             </View>
 
             <View style={styles.cardsGrid}>
-                {actionCardsInfo.map((card) => (
+                {!isHydrated || !isLoading ? actionCardsInfo.map((card) => (
                     <ModActionCard
                         key={card['card-title']}
                         cardTitle={card['card-title']}
                         cardInfo={card['card-info']}
                         cardLogo={card['card-logo']}
                     />
-                ))}
+                )):
+                <ActivityIndicator/>
+                }
             </View>
 
             <View style={styles.spacedSection}>

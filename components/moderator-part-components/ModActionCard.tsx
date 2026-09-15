@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ActionCardProps {
     cardTitle: string;
-    cardInfo: string;
+    cardInfo: number | string;
     cardLogo: ImageSourcePropType;
 }
 
