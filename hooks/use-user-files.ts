@@ -1,3 +1,4 @@
+import { useModeratorStorage } from '@/components/stores/moderatorStore';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { AppwriteException, ID, Query } from 'react-native-appwrite';
@@ -36,7 +37,6 @@ export const uploadBucketsIds: Record<FileType, string> = {
   history_audio_covers: process.env.EXPO_PUBLIC_STORAGE_HISTORY_AUDIO_ARCHIVE_COVERS_ID || '',
   'event-cover-photo': process.env.EXPO_PUBLIC_STORAGE_EVENT_COVER_PHOTOS_ID || '',
   'artickle-media': process.env.EXPO_PUBLIC_STORAGE_ARTICKLE_PHOTOS || '',
-
   word_attachment: process.env.EXPO_PUBLIC_STORAGE_WORD_ATTACHMENT_ID || '',
   pronunciation_audio: process.env.EXPO_PUBLIC_STORAGE_PRONUNCIATION_AUDIO_ID || '',
   evidence_photo: process.env.EXPO_PUBLIC_STORAGE_EVIDENCE_PHOTO_ID || '',
@@ -105,6 +105,7 @@ interface UseUserFilesReturn {
   hasProfilePhoto: () => boolean;
   hasCoverPhoto: () => boolean;
   getAllApprovedHistoryArchives: () => Promise<UserFileData[]>;
+  getAllUnapprovedHistoryArchives: () => Promise<UserFileData[]>;
   resetError: () => void;
   refresh: () => Promise<void>;
 }
@@ -117,6 +118,19 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
   const [error, setError] = useState<AppwriteException | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const prependPDFArchivesForModerationIds = useModeratorStorage(
+    (state) => state.prependPDFArchivesForModerationIds
+  );
+  const prependAudioFilesForModerationIds = useModeratorStorage(
+    (state) => state.prependAudioFilesForModerationIds
+  );
+  const removePDFArchiveForModerationId = useModeratorStorage(
+    (state) => state.removePDFArchiveForModerationId
+  );
+  const removeAudioFileForModerationId = useModeratorStorage(
+    (state) => state.removeAudioFileForModerationId
+  );
 
   const getFileUrl = useCallback((fileId: string): string => {
     return `${endpoint}/storage/buckets/${STORAGE_BUCKET_ID}/files/${fileId}/view?project=${projectId}`;
@@ -136,7 +150,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
   const getArtickleMediaFile = useCallback((fileId: string): string => {
     return `${endpoint}/storage/buckets/${uploadBucketsIds['artickle-media']}/files/${fileId}/view?project=${projectId}`;
-  }, [])
+  }, []);
 
   const fetchUserFiles = useCallback(async (): Promise<void> => {
     if (!user_id) {
@@ -177,7 +191,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
           fileUrl,
           title: doc.title || '',
           description: doc.description || '',
-          is_approved: true,
+          is_approved: doc.is_approved ?? true,
         };
       });
 
@@ -315,7 +329,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
           {
             method: 'POST',
             headers,
-            body: formData
+            body: formData,
           }
         );
 
@@ -332,6 +346,8 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
 
         console.log('Storage upload successful:', storageResponse.$id);
 
+        const isApproved = options.is_approved ?? false;
+
         const docResponse = await databases.createDocument(
           DATABASE_ID,
           COLLECTION_ID,
@@ -344,7 +360,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
             file_id: storageResponse.$id,
             title: options.title || '',
             description: options.description || '',
-            is_approved: options.is_approved ?? false,
+            is_approved: isApproved,
           }
         );
 
@@ -371,6 +387,16 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
           setCoverPhoto(newFileData);
         }
 
+        if (!isApproved) {
+          const ref: [string, string] = [newFileData.file_id, newFileData.$id];
+
+          if (newFileData.file_type === 'document') {
+            prependPDFArchivesForModerationIds([ref]);
+          } else if (newFileData.file_type === 'history_audio') {
+            prependAudioFilesForModerationIds([ref]);
+          }
+        }
+
         return newFileData;
       } catch (err) {
         const appwriteError =
@@ -385,7 +411,12 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         setIsUploading(false);
       }
     },
-    [user_id, getFileUrl]
+    [
+      user_id,
+      getFileUrl,
+      prependPDFArchivesForModerationIds,
+      prependAudioFilesForModerationIds,
+    ]
   );
 
   const uploadHistoryArchive = useCallback(
@@ -494,6 +525,68 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     }
   }, [getHistoryArchiveUrl, getHistoryAudioUrl, getHistoryAudioCoverUrl]);
 
+  const getAllUnapprovedHistoryArchives = useCallback(async (): Promise<UserFileData[]> => {
+    try {
+      setError(null);
+
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+        Query.equal('file_type', ['document', 'history_audio']),
+        Query.equal('is_approved', false),
+        Query.orderDesc('$createdAt'),
+      ]);
+
+      const unapprovedFiles: UserFileData[] = await Promise.all(
+        response.documents.map(async (doc) => {
+          let fileUrl = undefined;
+          let coverPhotoUrl = undefined;
+          let coverPhotoId = undefined;
+
+          try {
+            if (doc.file_type === 'document') {
+              fileUrl = getHistoryArchiveUrl(doc.file_id);
+            } else if (doc.file_type === 'history_audio') {
+              fileUrl = getHistoryAudioUrl(doc.file_id);
+
+              if (doc.cover_photo_id) {
+                coverPhotoId = doc.cover_photo_id;
+                coverPhotoUrl = getHistoryAudioCoverUrl(doc.cover_photo_id);
+              } else if (doc.coverPhotoId) {
+                coverPhotoId = doc.coverPhotoId;
+                coverPhotoUrl = getHistoryAudioCoverUrl(doc.coverPhotoId);
+              }
+            }
+          } catch (err) {
+            console.error('Error getting file URL:', err);
+          }
+
+          return {
+            user_id: doc.user_id,
+            file_name: doc.file_name,
+            file_type: doc.file_type,
+            uploaded_by: doc.uploaded_by,
+            file_id: doc.file_id,
+            $id: doc.$id,
+            createdAt: doc.$createdAt,
+            updatedAt: doc.$updatedAt,
+            fileUrl,
+            title: doc.title || '',
+            description: doc.description || '',
+            is_approved: doc.is_approved || false,
+            coverPhotoUrl: coverPhotoUrl,
+            coverPhotoId: coverPhotoId,
+          };
+        })
+      );
+
+      return unapprovedFiles;
+    } catch (err) {
+      const appwriteError = err as AppwriteException;
+      console.error('Error fetching unapproved history archives:', appwriteError.message);
+      setError(appwriteError);
+      throw err;
+    }
+  }, [getHistoryArchiveUrl, getHistoryAudioUrl, getHistoryAudioCoverUrl]);
+
   const deleteFile = useCallback(
     async (fileDocumentId: string, storageFileId: string): Promise<void> => {
       try {
@@ -515,6 +608,12 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         } else if (fileToDelete?.file_type === 'cover_photo') {
           setCoverPhoto(null);
         }
+
+        if (fileToDelete?.file_type === 'document') {
+          removePDFArchiveForModerationId(storageFileId);
+        } else if (fileToDelete?.file_type === 'history_audio') {
+          removeAudioFileForModerationId(storageFileId);
+        }
       } catch (err) {
         const appwriteError = err as AppwriteException;
         console.error('Error deleting file:', appwriteError.message);
@@ -524,7 +623,11 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
         setIsDeleting(false);
       }
     },
-    [files]
+    [
+      files,
+      removePDFArchiveForModerationId,
+      removeAudioFileForModerationId,
+    ]
   );
 
   const deleteProfilePhoto = useCallback(async (): Promise<void> => {
@@ -636,6 +739,7 @@ export function useUserFiles(user_id: string): UseUserFilesReturn {
     hasProfilePhoto,
     hasCoverPhoto,
     getAllApprovedHistoryArchives,
+    getAllUnapprovedHistoryArchives,
     resetError,
     refresh,
   };

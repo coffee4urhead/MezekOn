@@ -48,7 +48,7 @@ interface UseUserRolesReturn {
   loading: boolean;
   error: AppwriteException | null;
   isUpdating: boolean;
-  fetchUserRoles: () => Promise<void>;
+  fetchUserRoles: () => Promise<UserRoleData[]>;
   assignRole: (role: UserRole, region?: string) => Promise<UserRoleData>;
   revokeRole: (roleId: string) => Promise<void>;
   deactivateRole: (roleId: string) => Promise<void>;
@@ -73,42 +73,44 @@ export function useUserRoles(user_id: string): UseUserRolesReturn {
   const [error, setError] = useState<AppwriteException | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchUserRoles = useCallback(async () => {
-    if (!user_id) {
-      setLoading(false);
-      return;
-    }
+  const fetchUserRoles = useCallback(async (): Promise<UserRoleData[]> => {
+  if (!user_id) {
+    setLoading(false);
+    return [];
+  }
 
-    try {
-      setLoading(true);
-      setError(null);
+  try {
+    setLoading(true);
+    setError(null);
 
-      const response = await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTION_ID,
-        [Query.equal('user_id', user_id)]
-      );
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTION_ID,
+      [Query.equal('user_id', user_id)]
+    );
 
-      const rolesData: UserRoleData[] = response.documents.map(doc => ({
-        user_id: doc.user_id,
-        region_for_role: doc.region_for_role || null,
-        unlocked_at: new Date(doc.unlocked_at),
-        is_active: doc.is_active,
-        role: doc.role,
-        documentId: doc.$id,
-        createdAt: doc.$createdAt,
-        updatedAt: doc.$updatedAt
-      }));
+    const rolesData: UserRoleData[] = response.documents.map(doc => ({
+      user_id: doc.user_id,
+      region_for_role: doc.region_for_role || null,
+      unlocked_at: new Date(doc.unlocked_at),
+      is_active: doc.is_active,
+      role: doc.role,
+      documentId: doc.$id,
+      createdAt: doc.$createdAt,
+      updatedAt: doc.$updatedAt
+    }));
 
-      setRoles(rolesData);
-    } catch (err) {
-      const appwriteError = err as AppwriteException;
-      console.error('Error fetching user roles:', appwriteError.message);
-      setError(appwriteError);
-    } finally {
-      setLoading(false);
-    }
-  }, [user_id]);
+    setRoles(rolesData);
+    return rolesData;            
+  } catch (err) {
+    const appwriteError = err as AppwriteException;
+    console.error('Error fetching user roles:', appwriteError.message);
+    setError(appwriteError);
+    return [];
+  } finally {
+    setLoading(false);
+  }
+}, [user_id]);
 
   const createDefaultRole = async (userId: string): Promise<UserRoleData> => {
     try {
