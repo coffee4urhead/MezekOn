@@ -60,6 +60,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [password, setPassword] = useState('');
   const [userCache, setUserCache] = useState<Map<string, User>>(new Map());
 
+  console.log('User id before role fetch: ', user?.$id);
+
   const {
     activeRoles,
     loading: rolesLoading,
@@ -155,9 +157,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         
         if (userData.$id) {
           try {
-            await fetchUserRoles();
+            const freshRoles = await fetchUserRoles()
             
-            const highestRoleData = getHighestRoleFn();
+            const roleHierarchy: Record<UserRole, number> = {
+              'explorer': 10,
+              'guardian': 80,
+              'contributor': 40,
+              'admin': 100,
+              'keeper': 55,
+              'narrator': 20,
+              'curator': 85,
+              'collector': 50,
+              "scholar": 90
+            };
+
+            const activeFreshRoles = freshRoles.filter(r => r.is_active);
+            const highestRoleData = activeFreshRoles.reduce<UserRoleData | null>(
+            (highest, current) => {
+              if (!highest) return current;
+              const currLevel = roleHierarchy[current.role] || 0;
+              const highLevel = roleHierarchy[highest.role] || 0;
+              return currLevel > highLevel ? current : highest;
+            },
+            null
+          );
+
             const highestRole: UserRole | undefined = highestRoleData ? highestRoleData.role as UserRole : undefined;
             
             setUser({
