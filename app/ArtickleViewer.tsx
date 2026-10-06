@@ -1,4 +1,5 @@
 import ImageModal from '@/components/modals/ViewImageComponent';
+import ReportComment from '@/components/modals/ReportComment';
 import { useArtickleById, useArtickleStore, useArtickleWithMediaUrls } from '@/components/stores/artickleStore';
 import { useUserLikesStore } from '@/components/stores/useUserLikesStore';
 import { useTheme } from '@/context/ThemeContext';
@@ -59,6 +60,14 @@ export default function ArtickleViewer() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedComment, setSelectedComment] = useState<CommentData | null>(null);
+
+  const [editingText, setEditingText] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const editingInputRef = useRef<TextInput>(null);
+  const flatListRef = useRef<FlatList<CommentData>>(null);
+
   const defaultProfileLogo = require('@/assets/icons/avatar.png');
 
   useEffect(() => {
@@ -75,15 +84,15 @@ export default function ArtickleViewer() {
 
   const fetchCommentAuthors = async (commentList: CommentData[]) => {
     const authorMap = new Map(commentAuthors);
-    
+
     for (const comment of commentList) {
       if (!authorMap.has(comment.author_id)) {
         try {
           const author = await getUserById(comment.author_id);
-          
+
           if (author) {
             const photoUrl = await getUserProfilePhoto(comment.author_id);
-            
+
             authorMap.set(comment.author_id, {
               name: author.name || 'Unknown User',
               photo: photoUrl
@@ -103,7 +112,7 @@ export default function ArtickleViewer() {
         }
       }
     }
-    
+
     setCommentAuthors(authorMap);
   };
 
@@ -112,6 +121,14 @@ export default function ArtickleViewer() {
       fetchCommentAuthors(comments);
     }
   }, [comments]);
+
+  useEffect(() => {
+    if (!editingCommentId) return;
+    requestAnimationFrame(() => {
+      editingInputRef.current?.focus();
+      editingInputRef.current?.setSelection(editingText.length, editingText.length);
+    });
+  }, [editingCommentId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -215,6 +232,52 @@ export default function ArtickleViewer() {
     }
   };
 
+  const handleMenuPress = (comment: CommentData) => {
+    setSelectedComment(comment);
+    setMenuVisible(true);
+  };
+
+  const handleReportComment = () => {
+    Alert.alert('Докладвано', 'Благодарим, че докладвахте този коментар.');
+  };
+
+  const handleCopyComment = () => {
+    Alert.alert('Копирано', 'Текстът е копиран.');
+  };
+
+  const handleEditComment = (comment: CommentData | null) => {
+    if (!comment) return;
+    setEditingCommentId(comment.$id);
+    setEditingText(comment.comment_content);
+  };
+
+  const handleDeleteComment = () => {
+    Alert.alert(
+      'Изтриване',
+      'Сигурни ли сте, че искате да изтриете този коментар?',
+      [
+        { text: 'Отказ', style: 'cancel' },
+        {
+          text: 'Изтрий',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('Изтрито', 'Коментарът е изтрит.');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveEdit = () => {
+    const trimmed = editingText.trim();
+    if (!trimmed) return;
+    
+    // Here you would call the function to update the comment in your backend or state management
+    setEditingCommentId(null);
+    setEditingText('');
+    editingInputRef.current?.blur();
+  };
+
   const renderComment = ({ item }: { item: CommentData }) => {
     const isOwnComment = item.author_id === user?.$id;
     const authorInfo = commentAuthors.get(item.author_id);
@@ -246,10 +309,37 @@ export default function ArtickleViewer() {
             <Text style={[styles.commentTime, { color: isDark ? '#888' : '#888' }]}>
               {formatDate(item.$createdAt)}
             </Text>
+            <TouchableOpacity
+              onPress={() => handleMenuPress(item)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={16} color={isDark ? '#888' : '#666'} />
+            </TouchableOpacity>
           </View>
-          <Text style={[styles.commentText, { color: isDark ? '#ccc' : '#333' }]}>
-            {item.comment_content}
-          </Text>
+
+          {editingCommentId === item.$id ? (
+            <TextInput
+              ref={editingInputRef}
+              style={[
+                styles.editingInput,
+                {
+                  color: isDark ? '#fff' : '#1a1a1a',
+                  backgroundColor: isDark ? '#2a2a2a' : '#f0f2f5',
+                },
+              ]}
+              value={editingText}
+              onChangeText={setEditingText}
+              submitBehavior="blurAndSubmit"
+              multiline
+              returnKeyType="done"
+              onSubmitEditing={handleSaveEdit}
+            />
+          ) : (
+            <Text style={[styles.commentText, { color: isDark ? '#ccc' : '#333' }]}>
+              {item.comment_content}
+            </Text>
+          )}
+
           <View style={styles.commentActions}>
             <TouchableOpacity style={styles.commentActionButton}>
               <Ionicons name="heart-outline" size={14} color={isDark ? '#888' : '#666'} />
@@ -476,6 +566,7 @@ export default function ArtickleViewer() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
         <FlatList
+          ref={flatListRef}
           data={comments}
           keyExtractor={(item) => item.$id}
           renderItem={renderComment}
@@ -483,6 +574,11 @@ export default function ArtickleViewer() {
           ListFooterComponent={<View style={styles.footerSpacer} />}
           contentContainerStyle={[styles.contentContainer, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}
           showsVerticalScrollIndicator={false}
+          onScrollToIndexFailed={(info) => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            }, 300);
+          }}
         />
 
         <View
@@ -540,6 +636,16 @@ export default function ArtickleViewer() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ReportComment
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        isOwnComment={selectedComment?.author_id === user?.$id}
+        onReport={handleReportComment}
+        onCopy={handleCopyComment}
+        onEdit={() => handleEditComment(selectedComment)}
+        onDelete={handleDeleteComment}
+      />
     </SafeAreaView>
   );
 }
@@ -815,6 +921,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#0347F2',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  editingInput: {
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minHeight: 36,
+    maxHeight: 120,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#0347F2',
   },
   commentInputAvatarText: {
     color: '#fff',
