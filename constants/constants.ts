@@ -1,6 +1,6 @@
 import { Dimensions } from 'react-native';
 
-import { guess } from '../types';
+import { guess } from './types/index';
 
 export const { width: SIZE, height: HEIGHT } = Dimensions.get('window');
 

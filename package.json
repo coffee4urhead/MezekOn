@@ -25,13 +25,14 @@
     "@reduxjs/toolkit": "^2.13.0",
     "ajv": "^8.12.0",
     "blur": "^1.0.5",
-    "expo": "^57.0.9",
+    "eas": "^0.1.0",
+    "expo": "~57.0.28",
     "expo-asset": "~57.0.13",
     "expo-audio": "~57.0.4",
     "expo-blur": "~57.0.2",
     "expo-build-properties": "~57.0.13",
     "expo-constants": "~57.0.13",
-    "expo-dev-client": "~57.0.14",
+    "expo-dev-client": "~57.0.20",
     "expo-device": "~57.0.1",
     "expo-document-picker": "~57.0.1",
     "expo-file-system": "~57.0.5",
@@ -89,7 +90,8 @@
         "exclude": [
           "react-native-fs",
           "react-native-pdf-thumbnail",
-          "expo-av"
+          "expo-av",
+          "@react-native-community/geolocation"
         ],
         "listUnknownPackages": false
       }
@@ -98,7 +100,11 @@
       "exclude": [
         "@react-navigation/elements",
         "@react-navigation/material-top-tabs",
-        "@react-navigation/bottom-tabs"
+        "@react-navigation/bottom-tabs",
+        "lottie-react-native",
+        "@expo/ui",
+        "react-native",
+        "expo"
       ]
     }
   },

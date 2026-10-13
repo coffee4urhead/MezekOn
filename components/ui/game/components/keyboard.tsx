@@ -1,4 +1,3 @@
-
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -12,10 +11,10 @@ const keysEN: string[][] = [
   ['Enter', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '<'],
 ];
 
-const keysTR: string[][] = [
-  ['e', 'r', 't', 'y', 'u', 'ı', 'o', 'p', 'ğ', 'ü'],
-  ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ş', 'i'],
-  ['Enter', 'z', 'c', 'v', 'b', 'n', 'm', 'ö', 'ç', '<'],
+const keysBG: string[][] = [
+  ['я', 'в', 'е', 'р', 'т', 'ъ', 'у', 'и', 'о', 'п'],
+  ['а', 'с', 'д', 'ф', 'г', 'х', 'й', 'к', 'л'],
+  ['Enter', 'з', 'ь', 'ц', 'ж', 'б', 'н', 'м', '<'],
 ];
 
 interface KeyboardProps {
@@ -24,19 +23,16 @@ interface KeyboardProps {
 
 export default function Keyboard({ handleGuess }: KeyboardProps) {
   const { usedKeys, gameLanguage } = useAppSelector((state) => state.gameState);
-  const keyboard = gameLanguage === 'en' ? keysEN : keysTR;
+  const keyboard = gameLanguage === 'en' ? keysEN : keysBG;
+
   const handleKeyboardKeyColor = (key: string) => {
     const keyData = usedKeys[key];
-    if (keyData) {
-      if (keyData === 'correct') {
-        return colors.correct;
-      } else if (keyData === 'present') {
-        return colors.present;
-      } else if (keyData === 'absent') {
-        return colors.absent;
-      } else return colors.keyDefault;
-    } else return colors.keyDefault;
+    if (keyData === 'correct') return colors.correct;
+    if (keyData === 'present') return colors.present;
+    if (keyData === 'absent') return colors.absent;
+    return colors.keyDefault;
   };
+
   return (
     <View style={styles.keyboardContainer}>
       {keyboard.map((keysRow, idx) => (

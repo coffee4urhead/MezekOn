@@ -86,26 +86,34 @@ export default function HomeScreen() {
     );
   }
 
-  if (isLoggedIn && user) {
-
-    if (user.role === 'admin') {
-      return (
-      <View style={styles.container}>
-      <ThemeToggleButton/>
-      <ModMainScreen/>
-      </View>
-      )
-    } else {
-      console.log('User has role: ', user.role)
-      console.log('User id: ', user.$id);
-      return (
+  if (!isLoggedIn) {
+    return (
     <>
       <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
          <ThemeToggleButton />
          <Game></Game>
        </View>
     </>);
-  }
+  // if (isLoggedIn && user) {
+
+  //   if (user.role === 'admin') {
+  //     return (
+  //     <View style={styles.container}>
+  //     <ThemeToggleButton/>
+  //     <ModMainScreen/>
+  //     </View>
+  //     )
+  //   } else {
+  //     console.log('User has role: ', user.role)
+  //     console.log('User id: ', user.$id);
+  //     return (
+  //   <>
+  //     <View style={[styles.container, { backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }]}>
+  //        <ThemeToggleButton />
+  //        <Game></Game>
+  //      </View>
+  //   </>);
+  // }
 }
 
   return (

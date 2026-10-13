@@ -1,7 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AnimatedLottieView from 'lottie-react-native';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HEIGHT, initialGuesses, SIZE } from '../../../constants/constants';
 import { useAppDispatch, useAppSelector } from '../../../constants/hooks/storeHooks';
@@ -33,10 +41,15 @@ export default function Game() {
     gameLanguage,
   } = useAppSelector((state) => state.gameState);
   const dispatch = useAppDispatch();
-  (async () => {
-    const gameLanguage = (await getStoreData('language')) || 'en';
-    dispatch(setGameLanguage(gameLanguage));
-  })();
+const insets = useSafeAreaInsets();
+const tabBarHeight = 70 + (Platform.OS === 'android' ? insets.bottom : 8) + 100;
+
+  useEffect(() => {
+    (async () => {
+      const storedLang = (await getStoreData('language')) || 'en';
+      dispatch(setGameLanguage(storedLang));
+    })();
+  }, []);
 
   const lottieRef = useRef<AnimatedLottieView>(null);
 
@@ -67,8 +80,6 @@ export default function Game() {
     guess.letters.forEach((letter: string, idx: number) => {
       const keyValue = tempUsedKeys[letter];
       if (!keyValue) {
-        // eslint-disable-next-line
-        // @ts-ignore
         tempUsedKeys[letter] = guess.matches[idx];
       } else {
         if (keyValue === 'correct') return;
@@ -76,8 +87,6 @@ export default function Game() {
           tempUsedKeys[letter] = 'correct';
         } else if (keyValue === 'present' && guess.matches[idx] !== 'correct')
           return;
-        // eslint-disable-next-line
-        // @ts-ignore
         else tempUsedKeys[letter] = guess.matches[idx];
       }
     });
@@ -168,10 +177,7 @@ export default function Game() {
           if (letter === solution[index]) {
             matches.push('correct');
           } else if (solution.includes(letter)) {
-            if (
-              countInLeft <= totalCount &&
-              nonMatchingPairs.includes(letter)
-            ) {
+            if (countInLeft <= totalCount && nonMatchingPairs.includes(letter)) {
               matches.push('present');
             } else {
               matches.push('absent');
@@ -234,6 +240,7 @@ export default function Game() {
       setSolution(answers()[Math.floor(Math.random() * answers().length)])
     );
   };
+
   if (!gameStarted)
     return (
       <View style={styles.newGameScreen}>
@@ -242,19 +249,24 @@ export default function Game() {
         </TouchableOpacity>
       </View>
     );
+
   return (
-    <View style={{ position: 'relative' }}>
-      <GameBoard
-        solution={solution}
-        handleGuess={handleGuess}
-        resetGame={resetGame}
-      />
-      <AnimatedLottieView
-        ref={lottieRef}
-        style={styles.lottieContainer}
-        source={require('../lottie/confetti.json')}
-      />
-    </View>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <View style={{ flex: 1, position: 'relative' }}>
+          <View style={{ flex: 1, paddingBottom: tabBarHeight }}>
+            <GameBoard
+              solution={solution}
+              handleGuess={handleGuess}
+              resetGame={resetGame}
+            />
+          </View>
+          <AnimatedLottieView
+            ref={lottieRef}
+            style={styles.lottieContainer}
+            source={require('../lottie/confetti.json')}
+          />
+        </View>
+    </SafeAreaView>
   );
 }
 
@@ -266,6 +278,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     zIndex: 10,
     top: 20,
+    left: 0,
+    right: 0,
+    alignSelf: 'center',
+    pointerEvents: 'none',
   },
   newGameScreen: {
     flex: 1,

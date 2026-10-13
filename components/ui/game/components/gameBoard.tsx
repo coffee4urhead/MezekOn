@@ -70,7 +70,6 @@ export default GameBoard;
 const styles = StyleSheet.create({
   board: {
     width: SIZE,
-    height: HEIGHT,
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'space-evenly',
