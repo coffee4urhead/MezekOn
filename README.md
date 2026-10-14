@@ -1,7 +1,9 @@
 # 📖 MezekON
 
 **MezekON** is a mobile platform where language lives, breathes, and is passed on — a hybrid space that blends the warmth of a social network with the precision of a **living dictionary**, built with one mission at its **heart**: to gather **Bulgarian dialect words** in one place and make sure not a single one is lost to time.
+<p>
 <img src="./assets/icons/logo.png" alt="MezekON logo" width="200" />
+</p>
 At its core, MezekON is a **social media platform and a dictionary in one**. Every user becomes both a keeper and a discoverer of language. They can add words they grew up hearing — from their grandmother's kitchen, from a village they left long ago, from a region whose speech is fading — and give each one a home: its meaning, its region, its pronunciation, the story behind it. Other users can react, comment, confirm, or offer their own version, turning every entry into a small act of collective memory. Over time, these contributions build into a rich, searchable, community-driven archive of Bulgarian dialects — a dictionary written not by institutions, but by the people who speak it.
 ---
 
@@ -284,21 +286,21 @@ this page is split into 4 sub=pages:
    The backend is hosted into a local web server that uses a cloudflare domain. For safety reasons we won't share the domain
 <p align="left">
 
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/reactnative/reactnative-original-wordmark.svg" />
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/appwrite/appwrite-original-wordmark.svg" />
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/expo/expo-original-wordmark.svg" />
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original-wordmark.svg" />
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/reactrouter/reactrouter-original-wordmark.svg" />
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/chartjs/chartjs-original-wordmark.svg" />
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/reactnative/reactnative-original-wordmark.svg" width="40" height="40"/>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/appwrite/appwrite-original-wordmark.svg" width="40" height="40"/>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/expo/expo-original-wordmark.svg" width="40" height="40"/>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original-wordmark.svg" width="40" height="40"/>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/reactrouter/reactrouter-original-wordmark.svg" width="40" height="40"/>
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/chartjs/chartjs-original-wordmark.svg" width="40" height="40"/>
 <p>
-   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/redux/redux-original.svg" />
+   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/redux/redux-original.svg" width="40" height="40"/>
    React Redux
 </p>
 <p>
-   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/zustand/zustand-original.svg" />
+   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/zustand/zustand-original.svg" width="40" height="40"/>
    Zustand
 </p>
-<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/cloudflare/cloudflare-original-wordmark.svg" />
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/cloudflare/cloudflare-original-wordmark.svg" width="40" height="40"/>
           
 </p>
 
